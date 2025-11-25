@@ -118,8 +118,13 @@ func (r *userRepository) Create(req models.CreateUserRequest) (*models.User, err
 						   created_at, updated_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7, NOW(), NOW())
 		RETURNING created_at, updated_at`,
-		req.ID, req.Username, req.Email, req.PasswordHash,
-		req.FullName, req.RoleID, true,
+		req.ID,
+		req.Username,
+		req.Email,
+		req.PasswordHash,
+		req.FullName,
+		req.RoleID,
+		true,
 	).Scan(&createdAt, &updatedAt)
 
 	if err != nil {
@@ -152,28 +157,30 @@ func (r *userRepository) Update(id string, req models.UpdateUserRequest) (*model
 			updated_at=NOW()
 		WHERE id=$6
 		RETURNING updated_at`,
-		req.Username, req.Email, req.FullName,
-		req.RoleID, id,
+		req.Username,
+		req.Email,
+		req.FullName,
+		req.RoleID,
+		req.IsActive,
+		id,
 	).Scan(&updatedAt)
 
 	if err != nil {
 		return nil, err
 	}
 
-	updated := &models.User{
-		ID:       id,
-		Username: req.Username,
-		Email:    req.Email,
-		FullName: req.FullName,
-		RoleID:   req.RoleID,
+	return &models.User{
+		ID:        id,
+		Username:  req.Username,
+		Email:     req.Email,
+		FullName:  req.FullName,
+		RoleID:    req.RoleID,
+		IsActive:  req.IsActive,
 		UpdatedAt: updatedAt,
-	}
-
-	return updated, nil
+	}, nil
 }
 
 func (r *userRepository) Delete(id string) error {
-	_, err := r.db.Exec(`
-	DELETE FROM users WHERE id=$1`, id)
+	_, err := r.db.Exec(`DELETE FROM users WHERE id=$1`, id)
 	return err
 }

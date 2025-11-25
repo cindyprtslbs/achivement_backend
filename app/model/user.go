@@ -28,4 +28,5 @@ type UpdateUserRequest struct {
 	Email    string `json:"email"`
 	FullName string `json:"full_name"`
 	RoleID   string `json:"role_id"`
+	IsActive bool   `json:"is_active"`
 }
