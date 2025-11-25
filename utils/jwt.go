@@ -1,49 +1,44 @@
 package utils
 
-// import (
-// 	models "crud-app/app/model"
-// 	"time"
+import (
+	"time"
 
-// 	"github.com/golang-jwt/jwt/v5"
-// )
+	models "achievement_backend/app/model"
 
-var jwtSecret = []byte("mysupersecretkey_1234567890!@#$%^&")
+	"github.com/golang-jwt/jwt/v5"
+)
 
-// func GenerateToken(user models.User) (string, error) {
-// 	var alumniIDStr string
-// 	if user.AlumniID != nil {
-// 		alumniIDStr = user.AlumniID.Hex()
-// 	}
+var JwtSecret = []byte("mysupersecretkey_1234567890!@#$%^&")
 
-// 	claims := models.JWTClaims{
-// 		UserID:   user.ID,
-// 		Username: user.Username,
-// 		Role:     user.Role,
-// 		AlumniID: alumniIDStr, 
-// 		RegisteredClaims: jwt.RegisteredClaims{
-// 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-// 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-// 		},
-// 	}
+func GenerateToken(user models.User, permissions []string) (string, error) {
+	claims := models.JWTClaims{
+		UserID:      user.ID,
+		Username:    user.Username,
+		RoleID:      user.RoleID,
+		Permissions: permissions,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
 
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-// 	return token.SignedString(jwtSecret)
-// }
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(JwtSecret)
+}
 
-// func ValidateToken(tokenString string) (*models.JWTClaims, error) {
-// 	token, err := jwt.ParseWithClaims(tokenString, &models.JWTClaims{},
-// 		func(token *jwt.Token) (interface{}, error) {
-// 			return jwtSecret, nil
-// 		},
-// 	)
+func ValidateToken(tokenString string) (*models.JWTClaims, error) {
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&models.JWTClaims{},
+		func(t *jwt.Token) (interface{}, error) {
+			return JwtSecret, nil
+		},
+	)
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	if err != nil {
+		return nil, err
+	}
 
-// 	if claims, ok := token.Claims.(*models.JWTClaims); ok && token.Valid {
-// 		return claims, nil
-// 	}
-
-// 	return nil, jwt.ErrInvalidKey
-// }
+	claims := token.Claims.(*models.JWTClaims)
+	return claims, nil
+}
