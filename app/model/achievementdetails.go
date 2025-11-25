@@ -21,15 +21,15 @@ type AchievementDetails struct {
 		Start *time.Time `bson:"start,omitempty" json:"start,omitempty"`
 		End   *time.Time `bson:"end,omitempty" json:"end,omitempty"`
 	} `bson:"period,omitempty" json:"period,omitempty"`
-	CertificationName   *string    `bson:"certificationName,omitempty" json:"certificationName,omitempty"`
-	IssuedBy            *string    `bson:"issuedBy,omitempty" json:"issuedBy,omitempty"`
-	CertificationNumber *string    `bson:"certificationNumber,omitempty" json:"certificationNumber,omitempty"`
-	ValidUntil          *time.Time `bson:"validUntil,omitempty" json:"validUntil,omitempty"`
-	EventDate           *time.Time `bson:"eventDate,omitempty" json:"eventDate,omitempty"`
-	Location            *string    `bson:"location,omitempty" json:"location,omitempty"`
-	Organizer           *string    `bson:"organizer,omitempty" json:"organizer,omitempty"`
-	Score               *float64   `bson:"score,omitempty" json:"score,omitempty"`
-	CustomFields        map[string]any `bson:"customFields,omitempty" json:"customFields,omitempty"`
+	CertificationName   *string              `bson:"certificationName,omitempty" json:"certificationName,omitempty"`
+	IssuedBy            *string              `bson:"issuedBy,omitempty" json:"issuedBy,omitempty"`
+	CertificationNumber *string              `bson:"certificationNumber,omitempty" json:"certificationNumber,omitempty"`
+	ValidUntil          *time.Time           `bson:"validUntil,omitempty" json:"validUntil,omitempty"`
+	EventDate           *time.Time           `bson:"eventDate,omitempty" json:"eventDate,omitempty"`
+	Location            *string              `bson:"location,omitempty" json:"location,omitempty"`
+	Organizer           *string              `bson:"organizer,omitempty" json:"organizer,omitempty"`
+	Score               *float64             `bson:"score,omitempty" json:"score,omitempty"`
+	CustomFields        map[string]any       `bson:"customFields,omitempty" json:"customFields,omitempty"`
 }
 
 type Attachment struct {
@@ -50,13 +50,12 @@ type Achievement struct {
 	Tags            []string           `bson:"tags" json:"tags"`
 	Points          *float64           `bson:"points,omitempty" json:"points,omitempty"`
 
-	Status          string             `bson:"status" json:"status"` 
-	IsDeleted       bool               `bson:"isDeleted" json:"isDeleted"`
+	Status    string `bson:"status" json:"status"`     // draft, deleted (SRS: soft delete in mongo)
+	IsDeleted bool   `bson:"isDeleted" json:"isDeleted"`
 
-	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
-	UpdatedAt       time.Time          `bson:"updatedAt" json:"updatedAt"`
+	CreatedAt time.Time `bson:"createdAt" json:"createdAt"`
+	UpdatedAt time.Time `bson:"updatedAt" json:"updatedAt"`
 }
-
 
 type CreateAchievementRequest struct {
 	StudentID       string             `json:"studentId"`
@@ -77,10 +76,6 @@ type UpdateAchievementRequest struct {
 	Attachments     []Attachment       `json:"attachments"`
 	Tags            []string           `json:"tags"`
 	Points          *float64           `json:"points,omitempty"`
-}
-
-type UpdateAchievementStatusRequest struct {
-	Status        string  `json:"status"`        
 }
 
 type UpdateAchievementAttachmentsRequest struct {

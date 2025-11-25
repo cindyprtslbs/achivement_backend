@@ -11,15 +11,12 @@ type AchievementReferenceRepository interface {
 	GetByID(id string) (*models.AchievementReference, error)
 	GetByStudentID(studentID string) ([]models.AchievementReference, error)
 
-	Create(req models.CreateAchievementReferenceRequest) (*models.AchievementReference, error)
-	Update(id string, req models.UpdateAchievementReferenceRequest) (*models.AchievementReference, error)
+	Create(studentID string, mongoID string) (*models.AchievementReference, error)
 
-	Submit(id string) (*models.AchievementReference, error)
-	Verify(id string, verifierID string) (*models.AchievementReference, error)
-	Reject(id string, verifierID string, note string) (*models.AchievementReference, error)
-
-	SoftDelete(id string, userID string) (*models.AchievementReference, error)
-	Delete(id string) error
+	Submit(id string) error
+	Verify(id string, verifierID string) error
+	Reject(id string, verifierID string, note string) error
+	SoftDelete(id string, userID string) error
 }
 
 type achievementReferenceRepository struct {
@@ -136,7 +133,7 @@ func (r *achievementReferenceRepository) GetByStudentID(studentID string) ([]mod
 	return list, nil
 }
 
-func (r *achievementReferenceRepository) Create(req models.CreateAchievementReferenceRequest) (*models.AchievementReference, error) {
+func (r *achievementReferenceRepository) Create(studentID string, mongoID string) (*models.AchievementReference, error) {
 	var id string
 
 	err := r.db.QueryRow(`
@@ -145,14 +142,11 @@ func (r *achievementReferenceRepository) Create(req models.CreateAchievementRefe
 			submitted_at, verified_at, verified_by,
 			rejection_note, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, NULL, NULL, NULL, NULL, $4, $5)
+		VALUES ($1, $2, 'submitted', NOW(), NULL, NULL, NULL, NOW(), NOW())
 		RETURNING id
 	`,
-		req.StudentID,
-		req.MongoAchievementID,
-		req.Status,
-		time.Now(),
-		time.Now(),
+		studentID,
+		mongoID,
 	).Scan(&id)
 
 	if err != nil {
@@ -162,29 +156,7 @@ func (r *achievementReferenceRepository) Create(req models.CreateAchievementRefe
 	return r.GetByID(id)
 }
 
-func (r *achievementReferenceRepository) Update(id string, req models.UpdateAchievementReferenceRequest) (*models.AchievementReference, error) {
-	_, err := r.db.Exec(`
-		UPDATE achievement_references
-		SET student_id=$1,
-		    mongo_achievement_id=$2,
-		    status=$3,
-		    updated_at=$4
-		WHERE id = $5
-	`,
-		req.StudentID,
-		req.MongoAchievementID,
-		req.Status,
-		time.Now(),
-		id,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
-}
-
-func (r *achievementReferenceRepository) Submit(id string) (*models.AchievementReference, error) {
+func (r *achievementReferenceRepository) Submit(id string) error {
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='submitted',
@@ -193,14 +165,10 @@ func (r *achievementReferenceRepository) Submit(id string) (*models.AchievementR
 		WHERE id=$2
 	`, time.Now(), id)
 
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
+	return err
 }
 
-func (r *achievementReferenceRepository) Verify(id string, verifierID string) (*models.AchievementReference, error) {
+func (r *achievementReferenceRepository) Verify(id string, verifierID string) error {
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='verified',
@@ -211,14 +179,10 @@ func (r *achievementReferenceRepository) Verify(id string, verifierID string) (*
 		WHERE id=$3
 	`, time.Now(), verifierID, id)
 
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
+	return err
 }
 
-func (r *achievementReferenceRepository) Reject(id string, verifierID string, note string) (*models.AchievementReference, error) {
+func (r *achievementReferenceRepository) Reject(id string, verifierID string, note string) error {
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='rejected',
@@ -229,14 +193,10 @@ func (r *achievementReferenceRepository) Reject(id string, verifierID string, no
 		WHERE id=$4
 	`, time.Now(), verifierID, note, id)
 
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
+	return err
 }
 
-func (r *achievementReferenceRepository) SoftDelete(id string, userID string) (*models.AchievementReference, error) {
+func (r *achievementReferenceRepository) SoftDelete(id string, userID string) error {
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='deleted',
@@ -245,26 +205,7 @@ func (r *achievementReferenceRepository) SoftDelete(id string, userID string) (*
 		    rejection_note=NULL,
 		    updated_at=$1
 		WHERE id=$3
-	`, time.Now(), userID, id)
+	`, time.Now(), userID, id) 
 
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetByID(id)
-}
-
-func (r *achievementReferenceRepository) Delete(id string) error {
-	result, err := r.db.Exec(`DELETE FROM achievement_references WHERE id=$1`, id)
-
-	if err != nil {
-		return err
-	}
-
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
+	return err
 }
