@@ -82,16 +82,20 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	})
 }
 
-// getProfile
 func (s *AuthService) GetProfile(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-	user, err := s.userRepo.GetByID(userID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "database error"})
-	}
+	userID := c.Locals("user_id")
+	username := c.Locals("username")
+	roleID := c.Locals("role_id")
+	perms := c.Locals("permissions")
+
 	return c.JSON(fiber.Map{
 		"success": true,
-		"message": "profile fetched",
-		"data":    user,
+		"message": "Profile berhasil diambil",
+		"data": fiber.Map{
+			"user_id":     userID,
+			"username":    username,
+			"role_id":     roleID,
+			"permissions": perms,
+		},
 	})
 }
