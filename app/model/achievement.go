@@ -14,3 +14,15 @@ type AchievementReference struct {
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
+
+type CreateAchievementReferenceRequest struct {
+	StudentID          string `json:"student_id"`
+	MongoAchievementID string `json:"mongo_achievement_id"`
+	Status             string `json:"status"`
+}
+
+type UpdateAchievementReferenceRequest struct {
+	StudentID          string `json:"student_id"`
+	MongoAchievementID string `json:"mongo_achievement_id"`
+	Status             string `json:"status"`
+}

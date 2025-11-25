@@ -48,7 +48,41 @@ type Achievement struct {
 	Details         AchievementDetails `bson:"details" json:"details"`
 	Attachments     []Attachment       `bson:"attachments" json:"attachments"`
 	Tags            []string           `bson:"tags" json:"tags"`
-	Points          *float64           `bson:"points" json:"points"`
+	Points          *float64           `bson:"points,omitempty" json:"points,omitempty"`
+
+	Status          string             `bson:"status" json:"status"` 
+	IsDeleted       bool               `bson:"isDeleted" json:"isDeleted"`
+
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt       time.Time          `bson:"updatedAt" json:"updatedAt"`
+}
+
+
+type CreateAchievementRequest struct {
+	StudentID       string             `json:"studentId"`
+	AchievementType string             `json:"achievementType"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Details         AchievementDetails `json:"details"`
+	Attachments     []Attachment       `json:"attachments"`
+	Tags            []string           `json:"tags"`
+	Points          *float64           `json:"points,omitempty"`
+}
+
+type UpdateAchievementRequest struct {
+	AchievementType string             `json:"achievementType"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Details         AchievementDetails `json:"details"`
+	Attachments     []Attachment       `json:"attachments"`
+	Tags            []string           `json:"tags"`
+	Points          *float64           `json:"points,omitempty"`
+}
+
+type UpdateAchievementStatusRequest struct {
+	Status        string  `json:"status"`        
+}
+
+type UpdateAchievementAttachmentsRequest struct {
+	Attachments []Attachment `json:"attachments"`
 }
