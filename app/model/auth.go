@@ -8,18 +8,19 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token       string   `json:"token"`
+	Token       string   `json:"access_token"`
+	Refresh     string   `json:"refresh_token"`
 	UserID      string   `json:"user_id"`
 	Username    string   `json:"username"`
 	FullName    string   `json:"full_name"`
-	RoleID      string   `json:"role_id"`
+	RoleName    string   `json:"role_name"`
 	Permissions []string `json:"permissions"`
 }
 
 type JWTClaims struct {
 	UserID      string   `json:"user_id"`
 	Username    string   `json:"username"`
-	RoleID      string   `json:"role_id"`
+	RoleName    string   `json:"role_name"`
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }

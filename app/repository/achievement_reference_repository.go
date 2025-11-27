@@ -2,17 +2,15 @@ package repository
 
 import (
 	"database/sql"
-	models "achievement_backend/app/model"
 	"time"
+	models "achievement_backend/app/model"
 )
 
 type AchievementReferenceRepository interface {
 	GetAll() ([]models.AchievementReference, error)
 	GetByID(id string) (*models.AchievementReference, error)
 	GetByStudentID(studentID string) ([]models.AchievementReference, error)
-
 	Create(studentID string, mongoID string) (*models.AchievementReference, error)
-
 	Submit(id string) error
 	Verify(id string, verifierID string) error
 	Reject(id string, verifierID string, note string) error
@@ -66,15 +64,13 @@ func (r *achievementReferenceRepository) GetAll() ([]models.AchievementReference
 func (r *achievementReferenceRepository) GetByID(id string) (*models.AchievementReference, error) {
 	var a models.AchievementReference
 
-	row := r.db.QueryRow(`
+	err := r.db.QueryRow(`
 		SELECT id, student_id, mongo_achievement_id, status,
 		       submitted_at, verified_at, verified_by,
 		       rejection_note, created_at, updated_at
 		FROM achievement_references
 		WHERE id = $1
-	`, id)
-
-	err := row.Scan(
+	`, id).Scan(
 		&a.ID,
 		&a.StudentID,
 		&a.MongoAchievementID,
@@ -110,6 +106,7 @@ func (r *achievementReferenceRepository) GetByStudentID(studentID string) ([]mod
 	defer rows.Close()
 
 	var list []models.AchievementReference
+
 	for rows.Next() {
 		var a models.AchievementReference
 		if err := rows.Scan(
@@ -126,27 +123,33 @@ func (r *achievementReferenceRepository) GetByStudentID(studentID string) ([]mod
 		); err != nil {
 			return nil, err
 		}
-
 		list = append(list, a)
 	}
 
 	return list, nil
 }
 
+// ================= CREATE REFERENCE (FR-003) =================
+
 func (r *achievementReferenceRepository) Create(studentID string, mongoID string) (*models.AchievementReference, error) {
 	var id string
+	now := time.Now()
 
 	err := r.db.QueryRow(`
 		INSERT INTO achievement_references (
 			student_id, mongo_achievement_id, status,
 			submitted_at, verified_at, verified_by,
 			rejection_note, created_at, updated_at
+		) VALUES (
+			$1, $2, 'submitted',
+			$3, NULL, NULL,
+			NULL, $3, $3
 		)
-		VALUES ($1, $2, 'submitted', NOW(), NULL, NULL, NULL, NOW(), NOW())
 		RETURNING id
 	`,
 		studentID,
 		mongoID,
+		now,
 	).Scan(&id)
 
 	if err != nil {
@@ -156,19 +159,27 @@ func (r *achievementReferenceRepository) Create(studentID string, mongoID string
 	return r.GetByID(id)
 }
 
+// ================= SUBMIT (FR-003) =================
+
 func (r *achievementReferenceRepository) Submit(id string) error {
+	now := time.Now()
+
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='submitted',
 		    submitted_at=$1,
 		    updated_at=$1
 		WHERE id=$2
-	`, time.Now(), id)
+	`, now, id)
 
 	return err
 }
 
+// ================= VERIFY (FR-004) =================
+
 func (r *achievementReferenceRepository) Verify(id string, verifierID string) error {
+	now := time.Now()
+
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='verified',
@@ -177,12 +188,16 @@ func (r *achievementReferenceRepository) Verify(id string, verifierID string) er
 		    rejection_note=NULL,
 		    updated_at=$1
 		WHERE id=$3
-	`, time.Now(), verifierID, id)
+	`, now, verifierID, id)
 
 	return err
 }
 
+// ================= REJECT (FR-004) =================
+
 func (r *achievementReferenceRepository) Reject(id string, verifierID string, note string) error {
+	now := time.Now()
+
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='rejected',
@@ -191,12 +206,16 @@ func (r *achievementReferenceRepository) Reject(id string, verifierID string, no
 		    rejection_note=$3,
 		    updated_at=$1
 		WHERE id=$4
-	`, time.Now(), verifierID, note, id)
+	`, now, verifierID, note, id)
 
 	return err
 }
 
+// ================= SOFT DELETE (FR-010) =================
+
 func (r *achievementReferenceRepository) SoftDelete(id string, userID string) error {
+	now := time.Now()
+
 	_, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='deleted',
@@ -205,7 +224,7 @@ func (r *achievementReferenceRepository) SoftDelete(id string, userID string) er
 		    rejection_note=NULL,
 		    updated_at=$1
 		WHERE id=$3
-	`, time.Now(), userID, id) 
+	`, now, userID, id)
 
 	return err
 }

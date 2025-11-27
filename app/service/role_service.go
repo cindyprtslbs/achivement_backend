@@ -1,72 +1,110 @@
 package service
 
 import (
-	"errors"
-
 	models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
+
+	"github.com/gofiber/fiber/v2"
 )
 
-type RoleService interface {
-	GetAll() ([]models.Role, error)
-	GetByID(id string) (*models.Role, error)
-	Create(req models.CreateRoleRequest) (*models.Role, error)
-	Update(id string, req models.UpdateRoleRequest) (*models.Role, error)
-	Delete(id string) error
+type RoleService struct {
+	repo repository.RoleRepository
 }
 
-type roleService struct {
-	roleRepo repository.RoleRepository
+func NewRoleService(r repository.RoleRepository) *RoleService {
+	return &RoleService{repo: r}
 }
 
-func NewRoleService(roleRepo repository.RoleRepository) RoleService {
-	return &roleService{
-		roleRepo: roleRepo,
-	}
-}
-
-func (s *roleService) GetAll() ([]models.Role, error) {
-	return s.roleRepo.GetAll()
-}
-
-func (s *roleService) GetByID(id string) (*models.Role, error) {
-	return s.roleRepo.GetByID(id)
-}
-
-func (s *roleService) Create(req models.CreateRoleRequest) (*models.Role, error) {
-	roles, _ := s.roleRepo.GetAll()
-	for _, r := range roles {
-		if r.Name == req.Name {
-			return nil, errors.New("role name already exists")
-		}
-	}
-
-	return s.roleRepo.Create(req)
-}
-
-func (s *roleService) Update(id string, req models.UpdateRoleRequest) (*models.Role, error) {
-	role, err := s.roleRepo.GetByID(id)
+// =======================================================
+// GET ALL ROLES
+// =======================================================
+func (s *RoleService) GetAll(c *fiber.Ctx) error {
+	roles, err := s.repo.GetAll()
 	if err != nil {
-		return nil, errors.New("role not found")
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch roles"})
 	}
 
-	if req.Name != role.Name {
-		roles, _ := s.roleRepo.GetAll()
-		for _, r := range roles {
-			if r.Name == req.Name {
-				return nil, errors.New("role name already exists")
-			}
-		}
-	}
-
-	return s.roleRepo.Update(id, req)
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    roles,
+	})
 }
 
-func (s *roleService) Delete(id string) error {
-	_, err := s.roleRepo.GetByID(id)
+// =======================================================
+// GET ROLE BY ID
+// =======================================================
+func (s *RoleService) GetByID(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	role, err := s.repo.GetByID(id)
 	if err != nil {
-		return errors.New("role not found")
+		return c.Status(404).JSON(fiber.Map{"error": "role not found"})
 	}
 
-	return s.roleRepo.Delete(id)
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    role,
+	})
+}
+
+// =======================================================
+// CREATE ROLE
+// =======================================================
+func (s *RoleService) Create(c *fiber.Ctx) error {
+	var req models.CreateRoleRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	role, err := s.repo.Create(req)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to create role"})
+	}
+
+	return c.Status(201).JSON(fiber.Map{
+		"success": true,
+		"message": "role created",
+		"data":    role,
+	})
+}
+
+// =======================================================
+// UPDATE ROLE
+// =======================================================
+func (s *RoleService) Update(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var req models.UpdateRoleRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	role, err := s.repo.Update(id, req)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to update role"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "role updated",
+		"data":    role,
+	})
+}
+
+// =======================================================
+// DELETE ROLE
+// =======================================================
+func (s *RoleService) Delete(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	err := s.repo.Delete(id)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to delete role"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "role deleted",
+	})
 }

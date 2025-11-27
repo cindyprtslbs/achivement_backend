@@ -8,16 +8,18 @@ import (
 )
 
 type LecturerService struct {
-	repo repository.LecturerRepository
+	repo        repository.LecturerRepository
+	studentRepo repository.StudentRepository
 }
 
-func NewLecturerService(r repository.LecturerRepository) *LecturerService {
-	return &LecturerService{repo: r}
+func NewLecturerService(r repository.LecturerRepository, s repository.StudentRepository) *LecturerService {
+	return &LecturerService{
+		repo:        r,
+		studentRepo: s,
+	}
 }
-
 
 // GET ALL LECTURERS
-
 func (s *LecturerService) GetAll(c *fiber.Ctx) error {
 	data, err := s.repo.GetAll()
 	if err != nil {
@@ -30,9 +32,7 @@ func (s *LecturerService) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-
 // GET LECTURER BY ID
-
 func (s *LecturerService) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -47,9 +47,7 @@ func (s *LecturerService) GetByID(c *fiber.Ctx) error {
 	})
 }
 
-
-// GET LECTURER BY USER_ID
-
+// GET LECTURER BY USER ID
 func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
@@ -64,9 +62,7 @@ func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 	})
 }
 
-
 // CREATE LECTURER (ADMIN)
-
 func (s *LecturerService) Create(c *fiber.Ctx) error {
 	var req models.CreateLecturerRequest
 
@@ -86,9 +82,7 @@ func (s *LecturerService) Create(c *fiber.Ctx) error {
 	})
 }
 
-
 // UPDATE LECTURER (ADMIN)
-
 func (s *LecturerService) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -109,9 +103,7 @@ func (s *LecturerService) Update(c *fiber.Ctx) error {
 	})
 }
 
-
 // DELETE LECTURER (ADMIN)
-
 func (s *LecturerService) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -122,5 +114,23 @@ func (s *LecturerService) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "lecturer deleted",
+	})
+}
+
+// ============================================
+// GET ADVISEES (Mahasiswa Bimbingan Dosen)
+// GET /api/v1/lecturers/:id/advisees
+// ============================================
+func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
+	lecturerID := c.Params("id")
+
+	students, err := s.studentRepo.GetByAdvisorID(lecturerID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to get advisees"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    students,
 	})
 }

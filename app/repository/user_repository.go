@@ -13,6 +13,7 @@ type UserRepository interface {
 	GetByUsername(username string) (*models.User, error)
 	Create(req models.CreateUserRequest) (*models.User, error)
 	Update(id string, req models.UpdateUserRequest) (*models.User, error)
+	UpdateRole(id string, roleID string) error 
 	Delete(id string) error
 }
 
@@ -178,6 +179,16 @@ func (r *userRepository) Update(id string, req models.UpdateUserRequest) (*model
 		IsActive:  req.IsActive,
 		UpdatedAt: updatedAt,
 	}, nil
+}
+
+func (r *userRepository) UpdateRole(id string, roleID string) error {
+	_, err := r.db.Exec(`
+		UPDATE users
+		SET role_id = $1
+		WHERE id = $2
+	`, roleID, id)
+
+	return err
 }
 
 func (r *userRepository) Delete(id string) error {

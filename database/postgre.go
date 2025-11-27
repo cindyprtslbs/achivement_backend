@@ -14,7 +14,7 @@ func ConnectPostgre() {
 	var err error
 
 	// Sesuaikan dengan environment sistem Anda
-	dsn := "host=localhost user=postgres password=admin dbname=achievement_db port=5432 sslmode=disable"
+	dsn := "host=localhost user=postgres password=@cindy1501 dbname=prestasi_db port=5432 sslmode=disable"
 
 	PostgreDB, err = sql.Open("postgres", dsn)
 	if err != nil {
