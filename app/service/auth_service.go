@@ -19,9 +19,15 @@ type AuthService struct {
 	rolePermRepo repository.RolePermissionRepository
 }
 
+type refreshEntry struct {
+	ExpiresAt time.Time
+	UserID    string
+}
+
 var (
-	tokenBlacklist  = make(map[string]time.Time)
-	blacklistMutex  sync.RWMutex
+	// refreshTokens maps refresh token -> metadata (expires, user)
+	refreshTokens   = make(map[string]refreshEntry)
+	refreshMutex    sync.RWMutex
 	refreshTokenTTL = time.Hour * 24 * 7 // 7 hari
 )
 
@@ -101,9 +107,9 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	// ===============================================================
 	refreshToken := utils.GenerateRefreshToken()
 
-	blacklistMutex.Lock()
-	tokenBlacklist[refreshToken] = time.Now().Add(refreshTokenTTL)
-	blacklistMutex.Unlock()
+	refreshMutex.Lock()
+	refreshTokens[refreshToken] = refreshEntry{ExpiresAt: time.Now().Add(refreshTokenTTL), UserID: user.ID}
+	refreshMutex.Unlock()
 
 	// ===============================================================
 	// SUCCESS RESPONSE (SESUIAI SRS)
@@ -135,18 +141,16 @@ func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
 	}
 
 	// cek refresh token valid atau expired
-	blacklistMutex.RLock()
-	exp, exists := tokenBlacklist[body.Refresh]
-	blacklistMutex.RUnlock()
+	refreshMutex.RLock()
+	entry, exists := refreshTokens[body.Refresh]
+	refreshMutex.RUnlock()
 
-	if !exists || time.Now().After(exp) {
+	if !exists || time.Now().After(entry.ExpiresAt) {
 		return c.Status(401).JSON(fiber.Map{"error": "invalid or expired refresh token"})
 	}
 
-	// access token lama harus membawa user_id
-	userID := c.Locals("user_id").(string)
-
-	user, err := s.userRepo.GetByID(userID)
+	// get user id from stored refresh token entry
+	user, err := s.userRepo.GetByID(entry.UserID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "user not found"})
 	}
@@ -187,9 +191,23 @@ func (s *AuthService) Logout(c *fiber.Ctx) error {
 	token := raw.(string)
 	exp := time.Now().Add(time.Hour * 1)
 
-	blacklistMutex.Lock()
-	tokenBlacklist[token] = exp
-	blacklistMutex.Unlock()
+	// add token to global utils blacklist so middleware recognizes it
+	utils.BlacklistMutex.Lock()
+	utils.TokenBlacklist[token] = exp
+	utils.BlacklistMutex.Unlock()
+
+	// Revoke refresh tokens belonging to this user (if available in context)
+	uid := c.Locals("user_id")
+	if uid != nil {
+		userID := uid.(string)
+		refreshMutex.Lock()
+		for t, e := range refreshTokens {
+			if e.UserID == userID {
+				delete(refreshTokens, t)
+			}
+		}
+		refreshMutex.Unlock()
+	}
 
 	return c.JSON(fiber.Map{
 		"success": true,

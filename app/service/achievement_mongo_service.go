@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 
 	models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
@@ -121,7 +122,7 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 	}
 
 	// Validate student exist
-	student, err := s.studentRepo.GetByID(req.StudentID)
+	student, err := s.studentRepo.GetByStudentID(req.StudentID)
 	if err != nil || student == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
 	}
@@ -132,6 +133,24 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create draft"})
 	}
 
+	// Create achievement reference di PostgreSQL
+	mongoIDStr := res.ID.Hex()
+	log.Printf("[CREATE] Created achievement in MongoDB with ID: %s", mongoIDStr)
+	log.Printf("[CREATE] Student UUID: %s", student.ID)
+
+	_, err = s.refRepo.Create(student.ID, mongoIDStr)
+	if err != nil {
+		log.Printf("[CREATE] Error creating reference: %v", err)
+		// Log error tapi jangan buat response error - achievement sudah dibuat di MongoDB
+		// Hanya reference yang gagal, nanti bisa retry
+		return c.Status(201).JSON(fiber.Map{
+			"success": true,
+			"data":    res,
+			"warning": "achievement created but reference creation failed: " + err.Error(),
+		})
+	}
+
+	log.Printf("[CREATE] Successfully created reference for achievement %s", mongoIDStr)
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    res,

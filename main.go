@@ -5,9 +5,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"achievement_backend/database"
 	"achievement_backend/app/repository"
 	"achievement_backend/app/service"
+	"achievement_backend/database"
 	"achievement_backend/route"
 )
 
@@ -47,7 +47,7 @@ func main() {
 	studentService := service.NewStudentService(studentRepo)
 
 	// FIXED
-	lecturerService := service.NewLecturerService(lecturerRepo, studentRepo)
+	lecturerService := service.NewLecturerServiceWithDependencies(lecturerRepo, studentRepo, achievementRefRepo, achievementMongoRepo)
 
 	// FIXED
 	achievementService := service.NewAchievementMongoService(
@@ -57,6 +57,10 @@ func main() {
 	)
 
 	achievementRefService := service.NewAchievementReferenceService(achievementRefRepo)
+
+	achievementHistoryService := service.NewAchievementHistoryService(achievementRefRepo, achievementMongoRepo)
+
+	reportService := service.NewReportService(achievementRefRepo, studentRepo, lecturerRepo, achievementMongoRepo, userRepo)
 
 	// ============================================================
 	// 4. INIT FIBER
@@ -77,6 +81,8 @@ func main() {
 		lecturerService,
 		achievementService,
 		achievementRefService,
+		achievementHistoryService,
+		reportService,
 	)
 
 	// ============================================================

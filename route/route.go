@@ -19,6 +19,8 @@ func SetupRoutes(
 	lecturerService *service.LecturerService,
 	achievementService *service.AchievementMongoService,
 	achievementRefService *service.AchievementReferenceService,
+	achievementHistoryService *service.AchievementHistoryService,
+	reportService *service.ReportService,
 	// middleware *middleware.RBACMiddleware,
 ) {
 
@@ -69,10 +71,21 @@ func SetupRoutes(
 
 	ach.Post("/:id/attachments", middleware.PermissionRequired("achievement:update"), achievementService.UpdateAttachments)
 
+	// --- History ---
+	ach.Get("/:id/history", middleware.PermissionRequired("achievement:read"), achievementHistoryService.GetHistory)
+
 	// --- Reference Actions ---
 	ach.Post("/:id/submit", middleware.PermissionRequired("achievement:submit"), achievementRefService.Submit)
 	ach.Post("/:id/verify", middleware.PermissionRequired("achievement:verify"), achievementRefService.Verify)
 	ach.Post("/:id/reject", middleware.PermissionRequired("achievement:verify"), achievementRefService.Reject)
+
+	// --------------------------------------------
+	// REPORTS & ANALYTICS
+	// --------------------------------------------
+	reports := v1.Group("/reports")
+
+	reports.Get("/statistics", middleware.PermissionRequired("achievement:read"), reportService.GetStatistics)
+	reports.Get("/student/:id", middleware.PermissionRequired("student:read"), reportService.GetStudentReport)
 
 	// ----------------------------------------------------
 	// STUDENTS
@@ -91,6 +104,7 @@ func SetupRoutes(
 	lecturers := v1.Group("/lecturers")
 
 	lecturers.Get("/", middleware.PermissionRequired("lecturer:read"), lecturerService.GetAll)
+	lecturers.Get("/achievements", middleware.PermissionRequired("achievement:read"), lecturerService.GetAdviseesAchievements)
 	lecturers.Get("/:id", middleware.PermissionRequired("lecturer:read"), lecturerService.GetByID)
 	lecturers.Get("/:id/advisees", middleware.PermissionRequired("lecturer:read"), lecturerService.GetAdvisees)
 }

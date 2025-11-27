@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
 
@@ -10,12 +12,23 @@ import (
 type LecturerService struct {
 	repo        repository.LecturerRepository
 	studentRepo repository.StudentRepository
+	refRepo     repository.AchievementReferenceRepository
+	mongoRepo   repository.MongoAchievementRepository
 }
 
 func NewLecturerService(r repository.LecturerRepository, s repository.StudentRepository) *LecturerService {
 	return &LecturerService{
 		repo:        r,
 		studentRepo: s,
+	}
+}
+
+func NewLecturerServiceWithDependencies(r repository.LecturerRepository, s repository.StudentRepository, ref repository.AchievementReferenceRepository, mongo repository.MongoAchievementRepository) *LecturerService {
+	return &LecturerService{
+		repo:        r,
+		studentRepo: s,
+		refRepo:     ref,
+		mongoRepo:   mongo,
 	}
 }
 
@@ -132,5 +145,102 @@ func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    students,
+	})
+}
+
+// ============================================
+// GET ADVISEES ACHIEVEMENTS (Prestasi Mahasiswa Bimbingan)
+// GET /api/v1/lecturers/achievements
+// ============================================
+func (s *LecturerService) GetAdviseesAchievements(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	// Get query parameters for pagination
+	limit := c.QueryInt("limit", 10)
+	page := c.QueryInt("page", 1)
+	offset := (page - 1) * limit
+
+	// 1. Lookup lecturer record by user_id, then get advisor UUID
+	lecturer, err := s.repo.GetByUserID(userID)
+	if err != nil || lecturer == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
+	}
+
+	advisorID := lecturer.ID
+
+	// 2. Get student IDs dari advisees
+	students, err := s.studentRepo.GetByAdvisorID(advisorID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch advisees"})
+	}
+
+	if len(students) == 0 {
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    []interface{}{},
+			"pagination": fiber.Map{
+				"page":      page,
+				"limit":     limit,
+				"total":     0,
+				"totalPage": 0,
+			},
+		})
+	}
+
+	// Extract student UUIDs
+	var studentIDs []string
+	for _, s := range students {
+		studentIDs = append(studentIDs, s.ID)
+	}
+
+	// 2. Get achievement references
+	references, total, err := s.refRepo.GetByAdviseesWithPagination(studentIDs, limit, offset)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch achievement references"})
+	}
+
+	if len(references) == 0 {
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    []interface{}{},
+			"pagination": fiber.Map{
+				"page":      page,
+				"limit":     limit,
+				"total":     total,
+				"totalPage": (total + int64(limit) - 1) / int64(limit),
+			},
+		})
+	}
+
+	// 3. Fetch detail dari MongoDB dan enriching data
+	type AchievementWithDetail struct {
+		Reference models.AchievementReference `json:"reference"`
+		Detail    *models.Achievement         `json:"detail,omitempty"`
+	}
+
+	var result []AchievementWithDetail
+	ctx := context.Background()
+
+	for _, ref := range references {
+		achDetail, err := s.mongoRepo.GetByID(ctx, ref.MongoAchievementID)
+		if err != nil {
+			achDetail = nil // jika error, just set null
+		}
+
+		result = append(result, AchievementWithDetail{
+			Reference: ref,
+			Detail:    achDetail,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    result,
+		"pagination": fiber.Map{
+			"page":      page,
+			"limit":     limit,
+			"total":     total,
+			"totalPage": (total + int64(limit) - 1) / int64(limit),
+		},
 	})
 }

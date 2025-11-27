@@ -1,14 +1,15 @@
 package repository
 
 import (
-	"database/sql"
 	models "achievement_backend/app/model"
+	"database/sql"
 	"time"
 )
 
 type StudentRepository interface {
 	GetAll() ([]models.Student, error)
 	GetByID(id string) (*models.Student, error)
+	GetByStudentID(studentID string) (*models.Student, error)
 	GetByUserID(userID string) (*models.Student, error)
 	GetByAdvisorID(advisorID string) ([]models.Student, error)
 	Create(req models.CreateStudentRequest) (*models.Student, error)
@@ -64,6 +65,32 @@ func (r *studentRepository) GetByID(id string) (*models.Student, error) {
 		FROM students
 		WHERE id = $1
 	`, id)
+
+	err := row.Scan(
+		&s.ID,
+		&s.UserID,
+		&s.StudentID,
+		&s.ProgramStudy,
+		&s.AcademicYear,
+		&s.AdvisorID,
+		&s.CreatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (r *studentRepository) GetByStudentID(studentID string) (*models.Student, error) {
+	var s models.Student
+
+	row := r.db.QueryRow(`
+		SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
+		FROM students
+		WHERE student_id = $1
+	`, studentID)
 
 	err := row.Scan(
 		&s.ID,
