@@ -2,7 +2,13 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"log"
+	"mime/multipart"
+	"path/filepath"
+	"time"
 
 	models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
@@ -123,7 +129,23 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 
 	// Validate student exist
 	student, err := s.studentRepo.GetByStudentID(req.StudentID)
-	if err != nil || student == nil {
+	if err != nil {
+		// If not found by student_id (e.g. the client passed the UUID `id`),
+		// try lookup by ID. Repository returns sql.ErrNoRows when not found.
+		if errors.Is(err, sql.ErrNoRows) {
+			student, err = s.studentRepo.GetByID(req.StudentID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return c.Status(404).JSON(fiber.Map{"error": "student not found"})
+				}
+				return c.Status(500).JSON(fiber.Map{"error": "failed to fetch student"})
+			}
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch student"})
+		}
+	}
+
+	if student == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
 	}
 
@@ -203,14 +225,89 @@ func (s *AchievementMongoService) DeleteDraft(c *fiber.Ctx) error {
 func (s *AchievementMongoService) UpdateAttachments(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	var req models.UpdateAchievementAttachmentsRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid input"})
+	ctx := context.Background()
+
+	var attachments []models.Attachment
+
+	// Support multipart file upload (form field `attachments` as files)
+	contentType := c.Get("Content-Type")
+	isMultipart := c.Is("multipart/form-data")
+
+	if isMultipart || (contentType != "" && contentType[:19] == "multipart/form-data") {
+		form, err := c.MultipartForm()
+		if err != nil {
+			log.Printf("Multipart parse error: %v", err)
+			return c.Status(400).JSON(fiber.Map{"error": "invalid multipart form"})
+		}
+
+		// Try multiple field names (attachments, file, files)
+		var files []*multipart.FileHeader
+		for _, fieldName := range []string{"attachments", "file", "files"} {
+			if f, ok := form.File[fieldName]; ok && len(f) > 0 {
+				files = f
+				log.Printf("Found files under field name: %s (count: %d)", fieldName, len(f))
+				break
+			}
+		}
+
+		if len(files) == 0 {
+			// Log all available fields for debugging
+			availableFields := []string{}
+			for key := range form.File {
+				availableFields = append(availableFields, key)
+			}
+			log.Printf("No files found. Available file fields: %v", availableFields)
+			return c.Status(400).JSON(fiber.Map{
+				"error": "no files provided. Use field name: 'attachments', 'file', or 'files'",
+			})
+		}
+
+		for _, fh := range files {
+			// generate destination path and save file
+			dstName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(fh.Filename))
+			dst := filepath.Join("uploads", dstName)
+
+			if err := c.SaveFile(fh, dst); err != nil {
+				log.Printf("File save error: %v", err)
+				return c.Status(500).JSON(fiber.Map{"error": "failed to save file: " + err.Error()})
+			}
+
+			log.Printf("File saved: %s -> %s", fh.Filename, dst)
+
+			attachments = append(attachments, models.Attachment{
+				FileName:   fh.Filename,
+				FileURL:    "/uploads/" + dstName,
+				FileType:   fh.Header.Get("Content-Type"),
+				UploadedAt: time.Now(),
+			})
+		}
+
+		log.Printf("Processed %d files", len(attachments))
+
+	} else {
+		var req models.UpdateAchievementAttachmentsRequest
+		if err := c.BodyParser(&req); err != nil {
+			log.Printf("Body parse error: %v", err)
+			return c.Status(400).JSON(fiber.Map{"error": "invalid input"})
+		}
+
+		if len(req.Attachments) == 0 {
+			log.Printf("JSON attachments are nil or empty")
+			return c.Status(400).JSON(fiber.Map{"error": "attachments missing or null"})
+		}
+
+		attachments = req.Attachments
+		log.Printf("Parsed %d attachments from JSON", len(attachments))
 	}
 
-	ctx := context.Background()
-	res, err := s.mongoRepo.UpdateAttachments(ctx, id, req.Attachments)
+	if len(attachments) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "no attachments to update"})
+	}
+
+	// Prevent overwriting existing attachments with nil
+	res, err := s.mongoRepo.UpdateAttachments(ctx, id, attachments)
 	if err != nil {
+		log.Printf("UpdateAttachments repo error: %v", err)
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 

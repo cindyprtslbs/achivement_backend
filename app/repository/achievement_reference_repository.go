@@ -234,19 +234,25 @@ func (r *achievementReferenceRepository) Reject(id string, verifierID string, no
 // ================= SOFT DELETE =================
 func (r *achievementReferenceRepository) SoftDelete(id string) error {
 	now := time.Now()
+	
+	log.Printf("[REPO-SOFT-DELETE] Attempting to soft delete achievement reference ID: %s", id)
+	
 	res, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='deleted',
 		    updated_at=$1
-		WHERE id=$2 AND status='draft'
+		WHERE id=$2
 	`, now, id)
 	if err != nil {
+		log.Printf("[REPO-SOFT-DELETE] Database error: %v", err)
 		return err
 	}
 	rowsAffected, _ := res.RowsAffected()
 	if rowsAffected == 0 {
+		log.Printf("[REPO-SOFT-DELETE] No rows affected - achievement reference %s not found", id)
 		return sql.ErrNoRows
 	}
+	log.Printf("[REPO-SOFT-DELETE] Successfully soft deleted achievement reference ID: %s", id)
 	return nil
 }
 
