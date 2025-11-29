@@ -135,12 +135,12 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 
 	// Create achievement reference di PostgreSQL
 	mongoIDStr := res.ID.Hex()
-	log.Printf("[CREATE] Created achievement in MongoDB with ID: %s", mongoIDStr)
-	log.Printf("[CREATE] Student UUID: %s", student.ID)
+	log.Printf("Created achievement in MongoDB with ID: %s", mongoIDStr)
+	log.Printf("Student UUID: %s", student.ID)
 
 	_, err = s.refRepo.Create(student.ID, mongoIDStr)
 	if err != nil {
-		log.Printf("[CREATE] Error creating reference: %v", err)
+		log.Printf("Error creating reference: %v", err)
 		// Log error tapi jangan buat response error - achievement sudah dibuat di MongoDB
 		// Hanya reference yang gagal, nanti bisa retry
 		return c.Status(201).JSON(fiber.Map{
