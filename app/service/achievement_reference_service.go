@@ -172,9 +172,9 @@ func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Note string `json:"note"`
+		RejectionNote string `json:"rejection_note"`
 	}
-	if err := c.BodyParser(&req); err != nil || req.Note == "" {
+	if err := c.BodyParser(&req); err != nil || req.RejectionNote == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "rejection note is required"})
 	}
 
@@ -193,7 +193,7 @@ func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
 	}
 
 	// Reject dengan reference ID yang benar
-	err = s.repo.Reject(ref.ID, verifierID, req.Note)
+	err = s.repo.Reject(ref.ID, verifierID, req.RejectionNote)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(400).JSON(fiber.Map{"error": "only submitted achievements can be rejected"})
