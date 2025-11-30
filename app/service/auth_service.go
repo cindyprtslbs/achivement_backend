@@ -79,7 +79,7 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	// ===============================================================
 	// GET ROLE NAME
 	// ===============================================================
-	role, err := s.roleRepo.GetByID(user.RoleID)
+	role, err := s.roleRepo.GetByID(*user.RoleID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "role not found"})
 	}
@@ -87,7 +87,7 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	// ===============================================================
 	// GET PERMISSIONS
 	// ===============================================================
-	perms, _ := s.rolePermRepo.GetPermissionsByRole(user.RoleID)
+	perms, _ := s.rolePermRepo.GetPermissionsByRole(*user.RoleID)
 
 	var permList []string
 	for _, p := range perms {
@@ -161,7 +161,7 @@ func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
 	}
 
 	// permissions
-	perms, _ := s.rolePermRepo.GetPermissionsByRole(user.RoleID)
+	perms, _ := s.rolePermRepo.GetPermissionsByRole(*user.RoleID)
 
 	var permList []string
 	for _, p := range perms {
@@ -169,7 +169,7 @@ func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
 	}
 
 	// ambil role
-	role, _ := s.roleRepo.GetByID(user.RoleID)
+	role, _ := s.roleRepo.GetByID(*user.RoleID)
 
 	// token baru
 	newToken, err := utils.GenerateToken(*user, role.Name, permList)

@@ -136,7 +136,7 @@ func (r *userRepository) Create(req models.CreateUserRequest) (*models.User, err
 		Email:        req.Email,
 		PasswordHash: req.PasswordHash,
 		FullName:     req.FullName,
-		RoleID:       "",
+		RoleID:       nil,
 		IsActive:     isActive,
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
@@ -173,7 +173,7 @@ func (r *userRepository) Update(id string, req models.UpdateUserRequest) (*model
 		Username:  req.Username,
 		Email:     req.Email,
 		FullName:  req.FullName,
-		RoleID:    req.RoleID,
+		RoleID:    &req.RoleID,
 		IsActive:  req.IsActive,
 		UpdatedAt: updatedAt,
 	}, nil
