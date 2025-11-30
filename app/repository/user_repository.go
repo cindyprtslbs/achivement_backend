@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"database/sql"
 	models "achievement_backend/app/model"
+	"database/sql"
 	"time"
 )
 
@@ -13,7 +13,7 @@ type UserRepository interface {
 	GetByUsername(username string) (*models.User, error)
 	Create(req models.CreateUserRequest) (*models.User, error)
 	Update(id string, req models.UpdateUserRequest) (*models.User, error)
-	UpdateRole(id string, roleID string) error 
+	UpdateRole(id string, roleID string) error
 	Delete(id string) error
 }
 
@@ -112,34 +112,32 @@ func (r *userRepository) GetByUsername(username string) (*models.User, error) {
 }
 
 func (r *userRepository) Create(req models.CreateUserRequest) (*models.User, error) {
+	var id string
+	var isActive bool
 	var createdAt, updatedAt time.Time
 
 	err := r.db.QueryRow(`
-		INSERT INTO users (id, username, email, password_hash, full_name, role_id, is_active,
-						   created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7, NOW(), NOW())
-		RETURNING created_at, updated_at`,
-		req.ID,
+		INSERT INTO users (username, email, password_hash, full_name)
+		VALUES ($1,$2,$3,$4)
+		RETURNING id, is_active, created_at, updated_at`,
 		req.Username,
 		req.Email,
 		req.PasswordHash,
 		req.FullName,
-		req.RoleID,
-		true,
-	).Scan(&createdAt, &updatedAt)
+	).Scan(&id, &isActive, &createdAt, &updatedAt)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.User{
-		ID:           req.ID,
+		ID:           id,
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: req.PasswordHash,
 		FullName:     req.FullName,
-		RoleID:       req.RoleID,
-		IsActive:     true,
+		RoleID:       "",
+		IsActive:     isActive,
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 	}, nil

@@ -72,18 +72,13 @@ func (s *UserService) Create(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "username already taken"})
 	}
 
-	// Validasi role
-	if _, err := s.roleRepo.GetByID(req.RoleID); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid role_id"})
-	}
-
 	// Hash password
 	hashed, _ := bcrypt.GenerateFromPassword([]byte(req.PasswordHash), bcrypt.DefaultCost)
 	req.PasswordHash = string(hashed)
 
 	user, err := s.userRepo.Create(req)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
+		return c.Status(500).JSON(fiber.Map{"error": "failed to create user", "detail": err.Error()})
 	}
 
 	return c.Status(201).JSON(fiber.Map{

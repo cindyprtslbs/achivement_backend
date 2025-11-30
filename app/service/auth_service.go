@@ -115,13 +115,18 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	// SUCCESS RESPONSE (SESUIAI SRS)
 	// ===============================================================
 	resp := models.LoginResponse{
-		Token:       accessToken,
-		Refresh:     refreshToken,
-		UserID:      user.ID,
-		Username:    user.Username,
-		FullName:    user.FullName,
-		RoleName:    role.Name,
-		Permissions: permList,
+		Status: "success",
+		Data: models.LoginData{
+			Token:        accessToken,
+			RefreshToken: refreshToken,
+			User: models.LoginUser{
+				ID:          user.ID,
+				Username:    user.Username,
+				FullName:    user.FullName,
+				Role:        role.Name,
+				Permissions: permList,
+			},
+		},
 	}
 
 	return c.JSON(resp)
