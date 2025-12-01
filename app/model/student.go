@@ -27,3 +27,10 @@ type UpdateStudentRequest struct {
 	AcademicYear string `json:"academic_year"`
 	AdvisorID    string `json:"advisor_id"`
 }
+
+type SetStudentProfileRequest struct {
+    StudentID    string `json:"student_id"`
+    ProgramStudy string `json:"program_study"`
+    AcademicYear string `json:"academic_year"`
+	LecturerID   string `json:"lecturer_id"`
+}

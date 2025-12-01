@@ -47,6 +47,8 @@ func SetupRoutes(
 	users.Delete("/:id", middleware.PermissionRequired("user:delete"), userService.Delete)
 	users.Put("/:id/role", middleware.PermissionRequired("user:update_role"), userService.UpdateRole)
 	users.Put("/:id/lecturer-profile", middleware.PermissionRequired("user:update"), lecturerService.SetLecturerProfile)
+	users.Put("/:id/student-profile", middleware.PermissionRequired("user:update"), studentService.SetStudentProfile)
+
 
 	// ACHIEVEMENTS
 	ach := v1.Group("/achievements")

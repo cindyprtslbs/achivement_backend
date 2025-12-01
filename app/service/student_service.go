@@ -8,11 +8,21 @@ import (
 )
 
 type StudentService struct {
-	repo repository.StudentRepository
+	repo         repository.StudentRepository
+	userRepo     repository.UserRepository
+	lecturerRepo repository.LecturerRepository
 }
 
-func NewStudentService(r repository.StudentRepository) *StudentService {
-	return &StudentService{repo: r}
+func NewStudentService(
+    s repository.StudentRepository,
+    u repository.UserRepository,
+    l repository.LecturerRepository,
+) *StudentService {
+    return &StudentService{
+        repo:         s,
+        userRepo:     u,
+        lecturerRepo: l,
+    }
 }
 
 // ==========================================
@@ -186,3 +196,77 @@ func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true, "message": "advisor updated", "data": updated})
 }
+
+func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
+	userId := c.Params("id")
+
+	// Parse JSON request
+	var req models.SetStudentProfileRequest
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// 1. Check user exists
+	user, err := s.userRepo.GetByID(userId)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "User not found")
+	}
+
+	// 2. Check user role must be Mahasiswa
+	if user.RoleName != "Mahasiswa" {
+		return fiber.NewError(fiber.StatusBadRequest, "User is not assigned as Mahasiswa")
+	}
+
+	// 3. Validate advisor (lecturer) exists by lecturer_id (e.g. "DSN002")
+	lecturer, err := s.lecturerRepo.GetByLecturerID(req.LecturerID)
+	if err != nil || lecturer == nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Advisor (lecturer) not found")
+	}
+
+	advisorUUID := lecturer.ID
+
+	// 4. Check if student profile already exists
+	existing, err := s.repo.GetByUserID(userId)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// 5A. Update if exists
+	if existing != nil {
+		updated, err := s.repo.Update(existing.ID, models.UpdateStudentRequest{
+			UserID:       userId,
+			StudentID:    req.StudentID,
+			ProgramStudy: req.ProgramStudy,
+			AcademicYear: req.AcademicYear,
+			AdvisorID:    advisorUUID,
+		})
+		if err != nil {
+			return fiber.ErrInternalServerError
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Student profile updated successfully",
+			"data":    updated,
+		})
+	}
+
+	// 5B. Create new profile
+	created, err := s.repo.Create(models.CreateStudentRequest{
+		UserID:       userId,
+		StudentID:    req.StudentID,
+		ProgramStudy: req.ProgramStudy,
+		AcademicYear: req.AcademicYear,
+		AdvisorID:    advisorUUID,
+	})
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Student profile created successfully",
+		"data":    created,
+	})
+}
+

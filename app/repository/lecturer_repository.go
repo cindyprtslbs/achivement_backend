@@ -13,6 +13,7 @@ type LecturerRepository interface {
 	Create(req models.CreateLecturerRequest) (*models.Lecturer, error)
 	Update(id string, req models.UpdateLecturerRequest) (*models.Lecturer, error)
 	Delete(id string) error
+	GetByLecturerID(lecturerID string) (*models.Lecturer, error)
 }
 
 type lecturerRepository struct {
@@ -146,4 +147,28 @@ func (r *lecturerRepository) Delete(id string) error {
 	}
 
 	return nil
+}
+
+func (r *lecturerRepository) GetByLecturerID(lecturerID string) (*models.Lecturer, error) {
+	var l models.Lecturer
+
+	row := r.db.QueryRow(`
+		SELECT id, user_id, lecturer_id, department, created_at
+		FROM lecturers
+		WHERE lecturer_id = $1
+	`, lecturerID)
+
+	err := row.Scan(
+		&l.ID,
+		&l.UserID,
+		&l.LecturerID,
+		&l.Department,
+		&l.CreatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &l, nil
 }

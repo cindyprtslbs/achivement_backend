@@ -44,7 +44,7 @@ func main() {
 	permissionService := service.NewPermissionService(permissionRepo)
 	rolePermissionService := service.NewRolePermissionService(rolePermissionRepo)
 
-	studentService := service.NewStudentService(studentRepo)
+	studentService := service.NewStudentService(studentRepo, userRepo, lecturerRepo)
 
 	// FIXED
 	lecturerService := service.NewLecturerServiceWithDependencies(lecturerRepo, studentRepo, userRepo, achievementRefRepo, achievementMongoRepo)

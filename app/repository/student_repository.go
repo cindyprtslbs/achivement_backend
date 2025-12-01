@@ -58,81 +58,90 @@ func (r *studentRepository) GetAll() ([]models.Student, error) {
 }
 
 func (r *studentRepository) GetByID(id string) (*models.Student, error) {
-	var s models.Student
+    var s models.Student
 
-	row := r.db.QueryRow(`
-		SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
-		FROM students
-		WHERE id = $1
-	`, id)
+    row := r.db.QueryRow(`
+        SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
+        FROM students
+        WHERE id = $1
+    `, id)
 
-	err := row.Scan(
-		&s.ID,
-		&s.UserID,
-		&s.StudentID,
-		&s.ProgramStudy,
-		&s.AcademicYear,
-		&s.AdvisorID,
-		&s.CreatedAt,
-	)
+    err := row.Scan(
+        &s.ID,
+        &s.UserID,
+        &s.StudentID,
+        &s.ProgramStudy,
+        &s.AcademicYear,
+        &s.AdvisorID,
+        &s.CreatedAt,
+    )
 
-	if err != nil {
-		return nil, err
-	}
+    if err == sql.ErrNoRows {
+        return nil, nil // FIX
+    }
+    if err != nil {
+        return nil, err
+    }
 
-	return &s, nil
+    return &s, nil
 }
 
 func (r *studentRepository) GetByStudentID(studentID string) (*models.Student, error) {
-	var s models.Student
+    var s models.Student
 
-	row := r.db.QueryRow(`
-		SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
-		FROM students
-		WHERE student_id = $1
-	`, studentID)
+    row := r.db.QueryRow(`
+        SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
+        FROM students
+        WHERE student_id = $1
+    `, studentID)
 
-	err := row.Scan(
-		&s.ID,
-		&s.UserID,
-		&s.StudentID,
-		&s.ProgramStudy,
-		&s.AcademicYear,
-		&s.AdvisorID,
-		&s.CreatedAt,
-	)
+    err := row.Scan(
+        &s.ID,
+        &s.UserID,
+        &s.StudentID,
+        &s.ProgramStudy,
+        &s.AcademicYear,
+        &s.AdvisorID,
+        &s.CreatedAt,
+    )
 
-	if err != nil {
-		return nil, err
-	}
+    if err == sql.ErrNoRows {
+        return nil, nil // FIX
+    }
+    if err != nil {
+        return nil, err
+    }
 
-	return &s, nil
+    return &s, nil
 }
 
 func (r *studentRepository) GetByUserID(userID string) (*models.Student, error) {
-	var s models.Student
+    var s models.Student
 
-	row := r.db.QueryRow(`
-		SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
-		FROM students
-		WHERE user_id = $1
-	`, userID)
+    row := r.db.QueryRow(`
+        SELECT id, user_id, student_id, program_study, academic_year, advisor_id, created_at
+        FROM students
+        WHERE user_id = $1
+    `, userID)
 
-	err := row.Scan(
-		&s.ID,
-		&s.UserID,
-		&s.StudentID,
-		&s.ProgramStudy,
-		&s.AcademicYear,
-		&s.AdvisorID,
-		&s.CreatedAt,
-	)
+    err := row.Scan(
+        &s.ID,
+        &s.UserID,
+        &s.StudentID,
+        &s.ProgramStudy,
+        &s.AcademicYear,
+        &s.AdvisorID,
+        &s.CreatedAt,
+    )
 
-	if err != nil {
-		return nil, err
-	}
+    if err == sql.ErrNoRows {
+        return nil, nil // FIX
+    }
+    if err != nil {
+        return nil, err
+    }
 
-	return &s, nil
+    return &s, nil
 }
 
 func (r *studentRepository) GetByAdvisorID(advisorID string) ([]models.Student, error) {
