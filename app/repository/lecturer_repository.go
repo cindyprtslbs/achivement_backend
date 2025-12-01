@@ -92,6 +92,11 @@ func (r *lecturerRepository) GetByUserID(userID string) (*models.Lecturer, error
 		&l.Department,
 		&l.CreatedAt,
 	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // ← FIX
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +106,13 @@ func (r *lecturerRepository) GetByUserID(userID string) (*models.Lecturer, error
 
 func (r *lecturerRepository) Create(req models.CreateLecturerRequest) (*models.Lecturer, error) {
 	var id string
+	var createdAt time.Time
 
 	err := r.db.QueryRow(`
-		INSERT INTO lecturers (user_id, lecturer_id, department, created_at)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id
-	`, req.UserID, req.LecturerID, req.Department, time.Now()).Scan(&id)
-
+		INSERT INTO lecturers (user_id, lecturer_id, department)
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at
+	`, req.UserID, req.LecturerID, req.Department).Scan(&id, &createdAt)
 	if err != nil {
 		return nil, err
 	}
@@ -116,19 +121,14 @@ func (r *lecturerRepository) Create(req models.CreateLecturerRequest) (*models.L
 }
 
 func (r *lecturerRepository) Update(id string, req models.UpdateLecturerRequest) (*models.Lecturer, error) {
-	result, err := r.db.Exec(`
+	_, err := r.db.Exec(`
 		UPDATE lecturers
-		SET user_id=$1, lecturer_id=$2, department=$3
-		WHERE id = $4
-	`, req.UserID, req.LecturerID, req.Department, id)
+		SET lecturer_id=$1, department=$2
+		WHERE id = $3
+	`, req.LecturerID, req.Department, id)
 
 	if err != nil {
 		return nil, err
-	}
-
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return nil, sql.ErrNoRows
 	}
 
 	return r.GetByID(id)

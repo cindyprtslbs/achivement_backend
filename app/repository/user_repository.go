@@ -56,15 +56,19 @@ func (r *userRepository) GetAll() ([]models.User, error) {
 
 func (r *userRepository) GetByID(id string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, role_id, is_active,
-			   created_at, updated_at
-		FROM users WHERE id=$1`, id)
+		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id, r.name AS role_name, 
+			u.is_active, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN roles r ON u.role_id = r.id
+		WHERE u.id=$1`, 
+		id)
 
 	var u models.User
 	err := row.Scan(
 		&u.ID, &u.Username, &u.Email, &u.PasswordHash,
-		&u.FullName, &u.RoleID, &u.IsActive,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.FullName, &u.RoleID, &u.RoleName,
+		&u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

@@ -47,7 +47,7 @@ func main() {
 	studentService := service.NewStudentService(studentRepo)
 
 	// FIXED
-	lecturerService := service.NewLecturerServiceWithDependencies(lecturerRepo, studentRepo, achievementRefRepo, achievementMongoRepo)
+	lecturerService := service.NewLecturerServiceWithDependencies(lecturerRepo, studentRepo, userRepo, achievementRefRepo, achievementMongoRepo)
 
 	// FIXED
 	achievementService := service.NewAchievementMongoService(

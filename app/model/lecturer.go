@@ -21,3 +21,8 @@ type UpdateLecturerRequest struct {
 	LecturerID string `json:"lecturer_id"`
 	Department string `json:"department"`
 }
+
+type SetLecturerProfileRequest struct {
+	LecturerID string `json:"lecturer_id"`
+	Department string `json:"department"`
+}

@@ -12,24 +12,33 @@ import (
 type LecturerService struct {
 	repo        repository.LecturerRepository
 	studentRepo repository.StudentRepository
+	userRepo    repository.UserRepository 
 	refRepo     repository.AchievementReferenceRepository
 	mongoRepo   repository.MongoAchievementRepository
 }
 
-func NewLecturerService(r repository.LecturerRepository, s repository.StudentRepository) *LecturerService {
+func NewLecturerService(r repository.LecturerRepository, s repository.StudentRepository, u repository.UserRepository,) *LecturerService {
 	return &LecturerService{
 		repo:        r,
 		studentRepo: s,
+		userRepo:    u,
 	}
 }
 
-func NewLecturerServiceWithDependencies(r repository.LecturerRepository, s repository.StudentRepository, ref repository.AchievementReferenceRepository, mongo repository.MongoAchievementRepository) *LecturerService {
-	return &LecturerService{
-		repo:        r,
-		studentRepo: s,
-		refRepo:     ref,
-		mongoRepo:   mongo,
-	}
+func NewLecturerServiceWithDependencies(
+    r repository.LecturerRepository,
+    s repository.StudentRepository,
+    u repository.UserRepository,
+    ref repository.AchievementReferenceRepository,
+    mongo repository.MongoAchievementRepository,
+) *LecturerService {
+    return &LecturerService{
+        repo:        r,
+        studentRepo: s,
+        userRepo:    u,     
+        refRepo:     ref,
+        mongoRepo:   mongo,
+    }
 }
 
 // GET ALL LECTURERS
@@ -76,22 +85,63 @@ func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 }
 
 // CREATE LECTURER (ADMIN)
-func (s *LecturerService) Create(c *fiber.Ctx) error {
-	var req models.CreateLecturerRequest
+func (s *LecturerService) SetLecturerProfile(c *fiber.Ctx) error {
+	userId := c.Params("id")
 
+	// Parse request
+	var req models.SetLecturerProfileRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	lecturer, err := s.repo.Create(req)
+	// 1. Check user exists
+	user, err := s.userRepo.GetByID(userId)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to create lecturer"})
+		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	}
 
-	return c.Status(201).JSON(fiber.Map{
+	// 2. Check role must be Dosen Wali
+	if user.RoleName != "Dosen Wali" {
+		return fiber.NewError(fiber.StatusBadRequest, "User is not assigned as Dosen Wali")
+	}
+
+	// 3. Check if lecturer profile exists
+	existing, err := s.repo.GetByUserID(userId)
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	// 4A. Update existing profile
+	if existing != nil {
+		updated, err := s.repo.Update(existing.ID, models.UpdateLecturerRequest{
+			LecturerID: req.LecturerID,
+			Department: req.Department,
+		})
+		if err != nil {
+			return fiber.ErrInternalServerError
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Lecturer profile updated successfully",
+			"data":    updated,
+		})
+	}
+
+	// 4B. Create new profile
+	created, err := s.repo.Create(models.CreateLecturerRequest{
+		UserID:     userId,
+		LecturerID: req.LecturerID,
+		Department: req.Department,
+	})
+	if err != nil {
+		return fiber.ErrInternalServerError
+	}
+
+	return c.JSON(fiber.Map{
 		"success": true,
-		"message": "lecturer created",
-		"data":    lecturer,
+		"message": "Lecturer profile created successfully",
+		"data":    created,
 	})
 }
 
