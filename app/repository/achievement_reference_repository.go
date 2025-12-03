@@ -3,7 +3,6 @@ package repository
 import (
 	models "achievement_backend/app/model"
 	"database/sql"
-	"log"
 	"time"
 
 	"github.com/lib/pq"
@@ -14,7 +13,10 @@ type AchievementReferenceRepository interface {
 	GetByID(id string) (*models.AchievementReference, error)
 	GetByStudentID(studentID string) ([]models.AchievementReference, error)
 	GetByMongoAchievementID(mongoID string) (*models.AchievementReference, error)
+
 	GetByAdviseesWithPagination(studentIDs []string, limit int, offset int) ([]models.AchievementReference, int64, error)
+	GetAllWithPagination(limit, offset int) ([]models.AchievementReference, int64, error)
+
 	Create(studentID string, mongoID string) (*models.AchievementReference, error)
 	Submit(id string) error
 	Verify(id string, verifierID string) error
@@ -44,7 +46,8 @@ func (r *achievementReferenceRepository) GetAll() ([]models.AchievementReference
 	}
 	defer rows.Close()
 
-	var list []models.AchievementReference
+	list := []models.AchievementReference{}
+
 	for rows.Next() {
 		var a models.AchievementReference
 		if err := rows.Scan(
@@ -62,6 +65,7 @@ func (r *achievementReferenceRepository) GetAll() ([]models.AchievementReference
 // ================= GET BY ID =================
 func (r *achievementReferenceRepository) GetByID(id string) (*models.AchievementReference, error) {
 	var a models.AchievementReference
+
 	err := r.db.QueryRow(`
 		SELECT id, student_id, mongo_achievement_id, status,
 		       submitted_at, verified_at, verified_by,
@@ -73,9 +77,14 @@ func (r *achievementReferenceRepository) GetByID(id string) (*models.Achievement
 		&a.SubmittedAt, &a.VerifiedAt, &a.VerifiedBy,
 		&a.RejectionNote, &a.CreatedAt, &a.UpdatedAt,
 	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return &a, nil
 }
 
@@ -94,7 +103,7 @@ func (r *achievementReferenceRepository) GetByStudentID(studentID string) ([]mod
 	}
 	defer rows.Close()
 
-	var list []models.AchievementReference
+	list := []models.AchievementReference{}
 	for rows.Next() {
 		var a models.AchievementReference
 		if err := rows.Scan(
@@ -109,11 +118,9 @@ func (r *achievementReferenceRepository) GetByStudentID(studentID string) ([]mod
 	return list, nil
 }
 
-// ================= GET BY MONGO ACHIEVEMENT ID =================
+// ================= GET BY MONGO ID =================
 func (r *achievementReferenceRepository) GetByMongoAchievementID(mongoID string) (*models.AchievementReference, error) {
 	var a models.AchievementReference
-
-	log.Printf("[REPO-GET-BY-MONGO] Querying achievement_references where mongo_achievement_id='%s'", mongoID)
 
 	err := r.db.QueryRow(`
 		SELECT id, student_id, mongo_achievement_id, status,
@@ -126,21 +133,21 @@ func (r *achievementReferenceRepository) GetByMongoAchievementID(mongoID string)
 		&a.SubmittedAt, &a.VerifiedAt, &a.VerifiedBy,
 		&a.RejectionNote, &a.CreatedAt, &a.UpdatedAt,
 	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
-		log.Printf("[REPO-GET-BY-MONGO] Error querying: %v", err)
 		return nil, err
 	}
 
-	log.Printf("[REPO-GET-BY-MONGO] Found reference: %+v", a)
 	return &a, nil
 }
 
 // ================= CREATE =================
 func (r *achievementReferenceRepository) Create(studentID string, mongoID string) (*models.AchievementReference, error) {
-	var id string
 	now := time.Now()
-
-	log.Printf("[REPO-CREATE] Attempting to create reference - studentID: %s, mongoID: %s", studentID, mongoID)
+	var id string
 
 	err := r.db.QueryRow(`
 		INSERT INTO achievement_references (
@@ -150,12 +157,11 @@ func (r *achievementReferenceRepository) Create(studentID string, mongoID string
 			$1, $2, 'draft', $3, $3
 		) RETURNING id
 	`, studentID, mongoID, now).Scan(&id)
+
 	if err != nil {
-		log.Printf("[REPO-CREATE] Error inserting reference: %v", err)
 		return nil, err
 	}
 
-	log.Printf("[REPO-CREATE] Successfully created reference with ID: %s", id)
 	return r.GetByID(id)
 }
 
@@ -175,12 +181,8 @@ func (r *achievementReferenceRepository) Submit(id string) error {
 		return err
 	}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return sql.ErrNoRows
 	}
 
@@ -190,6 +192,7 @@ func (r *achievementReferenceRepository) Submit(id string) error {
 // ================= VERIFY =================
 func (r *achievementReferenceRepository) Verify(id string, verifierID string) error {
 	now := time.Now()
+
 	res, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='verified',
@@ -202,16 +205,19 @@ func (r *achievementReferenceRepository) Verify(id string, verifierID string) er
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
+
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return sql.ErrNoRows
 	}
+
 	return nil
 }
 
 // ================= REJECT =================
 func (r *achievementReferenceRepository) Reject(id string, verifierID string, note string) error {
 	now := time.Now()
+
 	res, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='rejected',
@@ -224,62 +230,62 @@ func (r *achievementReferenceRepository) Reject(id string, verifierID string, no
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
+
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return sql.ErrNoRows
 	}
+
 	return nil
 }
 
 // ================= SOFT DELETE =================
 func (r *achievementReferenceRepository) SoftDelete(id string) error {
 	now := time.Now()
-	
-	log.Printf("[REPO-SOFT-DELETE] Attempting to soft delete achievement reference ID: %s", id)
-	
+
 	res, err := r.db.Exec(`
 		UPDATE achievement_references
 		SET status='deleted',
 		    updated_at=$1
 		WHERE id=$2
+		  AND status='draft'
 	`, now, id)
 	if err != nil {
-		log.Printf("[REPO-SOFT-DELETE] Database error: %v", err)
 		return err
 	}
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		log.Printf("[REPO-SOFT-DELETE] No rows affected - achievement reference %s not found", id)
+
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return sql.ErrNoRows
 	}
-	log.Printf("[REPO-SOFT-DELETE] Successfully soft deleted achievement reference ID: %s", id)
+
 	return nil
 }
 
-// ================= GET BY ADVISEES WITH PAGINATION =================
+// ================= PAGINATION BY ADVISEES =================
 func (r *achievementReferenceRepository) GetByAdviseesWithPagination(studentIDs []string, limit int, offset int) ([]models.AchievementReference, int64, error) {
+
 	if len(studentIDs) == 0 {
 		return []models.AchievementReference{}, 0, nil
 	}
 
-	query := `
-SELECT id, student_id, mongo_achievement_id, status,
-       submitted_at, verified_at, verified_by,
-       rejection_note, created_at, updated_at
-FROM achievement_references
-WHERE student_id = ANY($1::uuid[])
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
-`
+	rows, err := r.db.Query(`
+		SELECT id, student_id, mongo_achievement_id, status,
+		       submitted_at, verified_at, verified_by,
+		       rejection_note, created_at, updated_at
+		FROM achievement_references
+		WHERE student_id = ANY($1::uuid[])
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`, pq.Array(studentIDs), limit, offset)
 
-	rows, err := r.db.Query(query, pq.Array(studentIDs), limit, offset)
 	if err != nil {
-		log.Printf("[REPO] Error querying achievements: %v", err)
 		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var list []models.AchievementReference
+	list := []models.AchievementReference{}
+
 	for rows.Next() {
 		var a models.AchievementReference
 		if err := rows.Scan(
@@ -287,24 +293,64 @@ LIMIT $2 OFFSET $3
 			&a.SubmittedAt, &a.VerifiedAt, &a.VerifiedBy,
 			&a.RejectionNote, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
-			log.Printf("[REPO] Error scanning row: %v", err)
 			return nil, 0, err
 		}
 		list = append(list, a)
 	}
 
-	countQuery := `
-SELECT COUNT(*)
-FROM achievement_references
-WHERE student_id = ANY($1::uuid[])
-`
 	var total int64
-	err = r.db.QueryRow(countQuery, pq.Array(studentIDs)).Scan(&total)
+	err = r.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM achievement_references
+		WHERE student_id = ANY($1::uuid[])
+	`, pq.Array(studentIDs)).Scan(&total)
+
 	if err != nil {
-		log.Printf("[REPO] Error counting rows: %v", err)
 		return nil, 0, err
 	}
 
-	log.Printf("[REPO] Retrieved %d achievements for advisees", len(list))
+	return list, total, nil
+}
+
+// ================= GET ALL WITH PAGINATION =================
+func (r *achievementReferenceRepository) GetAllWithPagination(limit, offset int) ([]models.AchievementReference, int64, error) {
+
+	rows, err := r.db.Query(`
+		SELECT id, student_id, mongo_achievement_id, status,
+		       submitted_at, verified_at, verified_by,
+		       rejection_note, created_at, updated_at
+		FROM achievement_references
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list := []models.AchievementReference{}
+
+	for rows.Next() {
+		var a models.AchievementReference
+		if err := rows.Scan(
+			&a.ID, &a.StudentID, &a.MongoAchievementID, &a.Status,
+			&a.SubmittedAt, &a.VerifiedAt, &a.VerifiedBy,
+			&a.RejectionNote, &a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		list = append(list, a)
+	}
+
+	var total int64
+	err = r.db.QueryRow(`
+		SELECT COUNT(*) FROM achievement_references
+	`).Scan(&total)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
 	return list, total, nil
 }

@@ -43,16 +43,53 @@ func NewLecturerServiceWithDependencies(
 
 // GET ALL LECTURERS
 func (s *LecturerService) GetAll(c *fiber.Ctx) error {
-	data, err := s.repo.GetAll()
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturers"})
-	}
+    role := c.Locals("role_name")
+    userID := c.Locals("user_id")
 
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    data,
-	})
+    if role == nil || userID == nil {
+        return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+    }
+
+    r := role.(string)
+    uid := userID.(string)
+
+    switch r {
+
+    case "Admin":
+        // Admin melihat semua dosen
+        data, err := s.repo.GetAll()
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturers"})
+        }
+        return c.JSON(fiber.Map{
+            "success": true,
+            "data":    data,
+        })
+
+    case "Dosen Wali":
+        // Dosen Wali hanya melihat dirinya sendiri
+        lecturer, err := s.repo.GetByUserID(uid)
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{
+                "error": "failed to fetch lecturer profile",
+            })
+        }
+        if lecturer == nil {
+            return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
+        }
+
+        return c.JSON(fiber.Map{
+            "success": true,
+            "data":    []models.Lecturer{*lecturer}, 
+        })
+
+    default:
+        return c.Status(403).JSON(fiber.Map{
+            "error": "forbidden: role cannot access lecturer list",
+        })
+    }
 }
+
 
 // GET LECTURER BY ID
 func (s *LecturerService) GetByID(c *fiber.Ctx) error {

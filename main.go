@@ -54,9 +54,10 @@ func main() {
 		achievementMongoRepo,
 		achievementRefRepo,
 		studentRepo,
+		lecturerRepo,
 	)
 
-	achievementRefService := service.NewAchievementReferenceService(achievementRefRepo)
+	achievementRefService := service.NewAchievementReferenceService(achievementRefRepo, achievementMongoRepo)
 
 	achievementHistoryService := service.NewAchievementHistoryService(achievementRefRepo, achievementMongoRepo)
 

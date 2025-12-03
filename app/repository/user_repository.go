@@ -59,13 +59,15 @@ func (r *userRepository) GetAll() ([]models.User, error) {
 
 func (r *userRepository) GetByID(id string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
-			u.role_id, r.name AS role_name, 
+		SELECT 
+			u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id,
+			COALESCE(r.name, '') AS role_name,
 			u.is_active, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN roles r ON u.role_id = r.id
-		WHERE u.id=$1`, 
-		id)
+		WHERE u.id = $1
+	`, id)
 
 	var u models.User
 	err := row.Scan(
@@ -82,15 +84,21 @@ func (r *userRepository) GetByID(id string) (*models.User, error) {
 
 func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, role_id, is_active,
-			   created_at, updated_at
-		FROM users WHERE email=$1`, email)
+		SELECT 
+			u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id,
+			COALESCE(r.name, '') AS role_name,
+			u.is_active, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN roles r ON u.role_id = r.id
+		WHERE u.email=$1
+	`, email)
 
 	var u models.User
 	err := row.Scan(
 		&u.ID, &u.Username, &u.Email, &u.PasswordHash,
-		&u.FullName, &u.RoleID, &u.IsActive,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.FullName, &u.RoleID, &u.RoleName,
+		&u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -101,15 +109,21 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 
 func (r *userRepository) GetByUsername(username string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT id, username, email, password_hash, full_name, role_id, is_active,
-			   created_at, updated_at
-		FROM users WHERE username=$1`, username)
+		SELECT 
+			u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id,
+			COALESCE(r.name, '') AS role_name,
+			u.is_active, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN roles r ON u.role_id = r.id
+		WHERE u.username=$1
+	`, username)
 
 	var u models.User
 	err := row.Scan(
 		&u.ID, &u.Username, &u.Email, &u.PasswordHash,
-		&u.FullName, &u.RoleID, &u.IsActive,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.FullName, &u.RoleID, &u.RoleName,
+		&u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

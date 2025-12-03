@@ -14,63 +14,73 @@ type StudentService struct {
 }
 
 func NewStudentService(
-    s repository.StudentRepository,
-    u repository.UserRepository,
-    l repository.LecturerRepository,
+	s repository.StudentRepository,
+	u repository.UserRepository,
+	l repository.LecturerRepository,
 ) *StudentService {
-    return &StudentService{
-        repo:         s,
-        userRepo:     u,
-        lecturerRepo: l,
-    }
+	return &StudentService{
+		repo:         s,
+		userRepo:     u,
+		lecturerRepo: l,
+	}
 }
 
-// ==========================================
-// GET ALL STUDENTS (role-aware)
-// ==========================================
+// ======================================================
+// GET ALL STUDENTS (Role Aware)
+// ======================================================
 func (s *StudentService) GetAll(c *fiber.Ctx) error {
 	userID := c.Locals("user_id")
 	roleName := c.Locals("role_name")
 
 	if userID == nil || roleName == nil {
-		return c.Status(401).JSON(fiber.Map{"error": "unauthorized: missing user session"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized: missing session"})
 	}
 
 	uid := userID.(string)
 	role := roleName.(string)
 
-	var students []models.Student
-	var err error
+	var (
+		students []models.Student
+		err      error
+	)
 
 	switch role {
 	case "Admin":
-		// Admin bisa lihat semua mahasiswa
 		students, err = s.repo.GetAll()
-	case "Dosen":
-		// Dosen hanya lihat mahasiswa yang dibimbing
-		students, err = s.repo.GetByAdvisorID(uid)
+
+	case "Dosen Wali":
+		lecturer, err := s.lecturerRepo.GetByUserID(uid)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturer"})
+		}
+		if lecturer == nil {
+			return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
+		}
+
+		// students, err = s.repo.GetByAdvisorID(lecturer.ID)
+
 	case "Mahasiswa":
-		// Mahasiswa hanya lihat dirinya sendiri
 		student, _ := s.repo.GetByUserID(uid)
 		if student != nil {
 			students = []models.Student{*student}
 		} else {
 			students = []models.Student{}
 		}
+
 	default:
-		return c.Status(403).JSON(fiber.Map{"error": "unauthorized role"})
+		return c.Status(403).JSON(fiber.Map{"error": "forbidden role"})
 	}
 
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch students"})
+		return c.Status(500).JSON(fiber.Map{"error": "failed to get students"})
 	}
 
 	return c.JSON(fiber.Map{"success": true, "data": students})
 }
 
-// ==========================================
+// ======================================================
 // GET STUDENT BY ID
-// ==========================================
+// ======================================================
 func (s *StudentService) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -82,9 +92,9 @@ func (s *StudentService) GetByID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": student})
 }
 
-// ==========================================
+// ======================================================
 // GET STUDENT BY USER ID
-// ==========================================
+// ======================================================
 func (s *StudentService) GetByUserID(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
@@ -96,9 +106,9 @@ func (s *StudentService) GetByUserID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": student})
 }
 
-// ==========================================
-// GET STUDENTS BY ADVISOR (Lecturer)
-// ==========================================
+// ======================================================
+// GET STUDENTS BY ADVISOR
+// ======================================================
 func (s *StudentService) GetByAdvisorID(c *fiber.Ctx) error {
 	advisorID := c.Params("advisor_id")
 
@@ -110,9 +120,9 @@ func (s *StudentService) GetByAdvisorID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "data": data})
 }
 
-// ==========================================
+// ======================================================
 // CREATE STUDENT (Admin)
-// ==========================================
+// ======================================================
 func (s *StudentService) Create(c *fiber.Ctx) error {
 	var req models.CreateStudentRequest
 
@@ -125,12 +135,16 @@ func (s *StudentService) Create(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create student"})
 	}
 
-	return c.Status(201).JSON(fiber.Map{"success": true, "message": "student created", "data": student})
+	return c.Status(201).JSON(fiber.Map{
+		"success": true,
+		"message": "student created",
+		"data":    student,
+	})
 }
 
-// ==========================================
+// ======================================================
 // UPDATE STUDENT (Admin)
-// ==========================================
+// ======================================================
 func (s *StudentService) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -144,12 +158,12 @@ func (s *StudentService) Update(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to update student"})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "message": "student updated", "data": student})
+	return c.JSON(fiber.Map{"success": true, "message": "updated", "data": student})
 }
 
-// ==========================================
-// DELETE STUDENT (Admin)
-// ==========================================
+// ======================================================
+// DELETE STUDENT
+// ======================================================
 func (s *StudentService) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -160,9 +174,9 @@ func (s *StudentService) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "message": "student deleted"})
 }
 
-// ==========================================
-// UPDATE ADVISOR (Admin / System)
-// ==========================================
+// ======================================================
+// UPDATE ADVISOR ONLY
+// ======================================================
 func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -172,73 +186,65 @@ func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 
 	var req AdvisorRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
 
-	// cek apakah student ada
 	student, err := s.repo.GetByID(id)
 	if err != nil || student == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
 	}
 
-	updateReq := models.UpdateStudentRequest{
-		UserID:       student.UserID,
-		StudentID:    student.StudentID,
-		ProgramStudy: student.ProgramStudy,
-		AcademicYear: student.AcademicYear,
-		AdvisorID:    req.AdvisorID,
-	}
-
-	updated, err := s.repo.Update(id, updateReq)
+	// update only advisor_id
+	err = s.repo.UpdateAdvisor(id, req.AdvisorID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to update advisor"})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "message": "advisor updated", "data": updated})
+	updated, _ := s.repo.GetByID(id)
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "advisor updated successfully",
+		"data":    updated,
+	})
 }
 
+// ======================================================
+// SET STUDENT PROFILE (Mahasiswa Only, No Advisor)
+// ======================================================
 func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
 	userId := c.Params("id")
 
-	// Parse JSON request
 	var req models.SetStudentProfileRequest
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	// 1. Check user exists
+	// Check user exists
 	user, err := s.userRepo.GetByID(userId)
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	}
 
-	// 2. Check user role must be Mahasiswa
+	// Must be Mahasiswa
 	if user.RoleName != "Mahasiswa" {
-		return fiber.NewError(fiber.StatusBadRequest, "User is not assigned as Mahasiswa")
+		return fiber.NewError(fiber.StatusBadRequest, "User is not Mahasiswa")
 	}
 
-	// 3. Validate advisor (lecturer) exists by lecturer_id (e.g. "DSN002")
-	lecturer, err := s.lecturerRepo.GetByLecturerID(req.LecturerID)
-	if err != nil || lecturer == nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Advisor (lecturer) not found")
-	}
-
-	advisorUUID := lecturer.ID
-
-	// 4. Check if student profile already exists
+	// Check existing profile
 	existing, err := s.repo.GetByUserID(userId)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// 5A. Update if exists
+	// UPDATE profile
 	if existing != nil {
 		updated, err := s.repo.Update(existing.ID, models.UpdateStudentRequest{
 			UserID:       userId,
 			StudentID:    req.StudentID,
 			ProgramStudy: req.ProgramStudy,
 			AcademicYear: req.AcademicYear,
-			AdvisorID:    advisorUUID,
+			AdvisorID:    existing.AdvisorID, // keep old advisor
 		})
 		if err != nil {
 			return fiber.ErrInternalServerError
@@ -251,13 +257,13 @@ func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	// 5B. Create new profile
+	// CREATE new profile
 	created, err := s.repo.Create(models.CreateStudentRequest{
 		UserID:       userId,
 		StudentID:    req.StudentID,
 		ProgramStudy: req.ProgramStudy,
 		AcademicYear: req.AcademicYear,
-		AdvisorID:    advisorUUID,
+		AdvisorID:    nil, // advisor belum di-set
 	})
 	if err != nil {
 		return fiber.ErrInternalServerError
@@ -269,4 +275,3 @@ func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
 		"data":    created,
 	})
 }
-

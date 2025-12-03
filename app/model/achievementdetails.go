@@ -2,6 +2,7 @@ package models
 
 import (
 	"time"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -9,19 +10,19 @@ import (
 // ACHIEVEMENT DETAILS (Flexible untuk banyak jenis prestasi)
 // ===============================================================
 type AchievementDetails struct {
-	CompetitionName  *string    `bson:"competitionName,omitempty" json:"competition_name,omitempty"`
-	CompetitionLevel *string    `bson:"competitionLevel,omitempty" json:"competition_level,omitempty"`
-	Rank             *int       `bson:"rank,omitempty" json:"rank,omitempty"`
-	MedalType        *string    `bson:"medal_type,omitempty" json:"medal_type,omitempty"`
+	CompetitionName  *string `bson:"competitionName,omitempty" json:"competition_name,omitempty"`
+	CompetitionLevel *string `bson:"competitionLevel,omitempty" json:"competition_level,omitempty"`
+	Rank             *int    `bson:"rank,omitempty" json:"rank,omitempty"`
+	MedalType        *string `bson:"medal_type,omitempty" json:"medal_type,omitempty"`
 
-	PublicationType  *string    `bson:"publicationType,omitempty" json:"publication_type,omitempty"`
-	PublicationTitle *string    `bson:"publicationTitle,omitempty" json:"publication_title,omitempty"`
-	Authors          []string   `bson:"authors,omitempty" json:"authors,omitempty"`
-	Publisher        *string    `bson:"publisher,omitempty" json:"publisher,omitempty"`
-	ISSN             *string    `bson:"issn,omitempty" json:"issn,omitempty"`
+	PublicationType  *string  `bson:"publicationType,omitempty" json:"publication_type,omitempty"`
+	PublicationTitle *string  `bson:"publicationTitle,omitempty" json:"publication_title,omitempty"`
+	Authors          []string `bson:"authors,omitempty" json:"authors,omitempty"`
+	Publisher        *string  `bson:"publisher,omitempty" json:"publisher,omitempty"`
+	ISSN             *string  `bson:"issn,omitempty" json:"issn,omitempty"`
 
-	OrganizationName *string    `bson:"organizationName,omitempty" json:"organization_name,omitempty"`
-	Position         *string    `bson:"position,omitempty" json:"position,omitempty"`
+	OrganizationName *string `bson:"organizationName,omitempty" json:"organization_name,omitempty"`
+	Position         *string `bson:"position,omitempty" json:"position,omitempty"`
 
 	Period *struct {
 		Start *time.Time `bson:"start,omitempty" json:"start,omitempty"`
@@ -67,8 +68,8 @@ type Achievement struct {
 	Tags        []string     `bson:"tags" json:"tags"`
 	Points      *float64     `bson:"points,omitempty" json:"points,omitempty"`
 
-	Status    string `bson:"status" json:"status"`          // draft / deleted (FR-005)
-	IsDeleted bool   `bson:"isDeleted" json:"is_deleted"`   // soft delete flag
+	Status    string `bson:"status" json:"status"`        // draft / deleted (FR-005)
+	IsDeleted bool   `bson:"isDeleted" json:"is_deleted"` // soft delete flag
 
 	CreatedAt time.Time `bson:"createdAt" json:"created_at"`
 	UpdatedAt time.Time `bson:"updatedAt" json:"updated_at"`

@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+
 	models "achievement_backend/app/model"
 )
 
@@ -26,6 +27,9 @@ type MongoAchievementRepository interface {
 	UpdateAttachments(ctx context.Context, id string, attachments []models.Attachment) (*models.Achievement, error)
 
 	SoftDelete(ctx context.Context, id string) error
+
+	GetManyByIDs(ctx context.Context, ids []string) (map[string]models.Achievement, error)
+	UpdateStatus(ctx context.Context, id string, status string) error
 }
 
 // ================= STRUCT =================
@@ -62,7 +66,7 @@ func (r *mongoAchievementRepository) GetAll(ctx context.Context) ([]models.Achie
 }
 
 // ================= LIST BY ADVISOR =================
-// Digunakan dosen wali melihat prestasi mahasiswa bimbingannya
+// mahasiswa bimbingan (studentID array)
 
 func (r *mongoAchievementRepository) GetByAdvisor(ctx context.Context, studentIDs []string) ([]models.Achievement, error) {
 	filter := bson.M{
@@ -114,23 +118,42 @@ func (r *mongoAchievementRepository) CreateDraft(ctx context.Context, req *model
 // ================= GET BY ID =================
 
 func (r *mongoAchievementRepository) GetByID(ctx context.Context, id string) (*models.Achievement, error) {
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
+    var result models.Achievement
 
-	var result models.Achievement
-	err = r.collection.FindOne(ctx, bson.M{
-		"_id":       objID,
-		"isDeleted": false,
-	}).Decode(&result)
+    // ======================================
+    // 1. Coba sebagai ObjectID
+    // ======================================
+    if oid, err := primitive.ObjectIDFromHex(id); err == nil {
+        err = r.collection.FindOne(ctx, bson.M{
+            "_id":       oid,
+            "isDeleted": false,
+        }).Decode(&result)
 
-	if err == mongo.ErrNoDocuments {
-		return nil, nil
-	}
+        if err == nil {
+            return &result, nil
+        }
 
-	return &result, err
+        // Kalau err == ErrNoDocuments → lanjut ke string mode
+        if !errors.Is(err, mongo.ErrNoDocuments) {
+            return nil, err
+        }
+    }
+
+    // ======================================
+    // 2. Fallback: cari _id STRING
+    // ======================================
+    err := r.collection.FindOne(ctx, bson.M{
+        "_id":       id,
+        "isDeleted": false,
+    }).Decode(&result)
+
+    if errors.Is(err, mongo.ErrNoDocuments) {
+        return nil, nil
+    }
+
+    return &result, err
 }
+
 
 // ================= LIST BY STUDENT =================
 
@@ -162,13 +185,10 @@ func (r *mongoAchievementRepository) UpdateDraft(ctx context.Context, id string,
 		return nil, err
 	}
 
-	var existing models.Achievement
-	if err := r.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&existing); err != nil {
-		return nil, err
-	}
-
-	if existing.Status != models.StatusDraft {
-		return nil, errors.New("prestasi hanya dapat diubah jika masih draft")
+	filter := bson.M{
+		"_id":       objID,
+		"status":    models.StatusDraft,
+		"isDeleted": false,
 	}
 
 	update := bson.M{
@@ -184,9 +204,13 @@ func (r *mongoAchievementRepository) UpdateDraft(ctx context.Context, id string,
 		},
 	}
 
-	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	result, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return nil, err
+	}
+
+	if result.ModifiedCount == 0 {
+		return nil, errors.New("prestasi hanya dapat diubah jika status masih draft")
 	}
 
 	return r.GetByID(ctx, id)
@@ -201,22 +225,29 @@ func (r *mongoAchievementRepository) UpdateAttachments(ctx context.Context, id s
 	}
 
 	var existing models.Achievement
-	if err := r.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&existing); err != nil {
+	err = r.collection.FindOne(ctx, bson.M{
+		"_id":       objID,
+		"isDeleted": false,
+	}).Decode(&existing)
+
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, errors.New("achievement not found")
+	}
+	if err != nil {
 		return nil, err
 	}
 
+	// Draft only
 	if existing.Status != models.StatusDraft {
 		return nil, errors.New("attachments hanya dapat diubah jika masih draft")
 	}
 
-	update := bson.M{
+	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objID}, bson.M{
 		"$set": bson.M{
 			"attachments": attachments,
 			"updatedAt":   time.Now(),
 		},
-	}
-
-	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +264,11 @@ func (r *mongoAchievementRepository) SoftDelete(ctx context.Context, id string) 
 	}
 
 	var existing models.Achievement
-	if err := r.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&existing); err != nil {
+	err = r.collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&existing)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return errors.New("achievement not found")
+	}
+	if err != nil {
 		return err
 	}
 
@@ -251,4 +286,64 @@ func (r *mongoAchievementRepository) SoftDelete(ctx context.Context, id string) 
 
 	_, err = r.collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
 	return err
+}
+
+// ================= GET MANY BY IDS =================
+
+func (r *mongoAchievementRepository) GetManyByIDs(ctx context.Context, ids []string) (map[string]models.Achievement, error) {
+	objIDs := []primitive.ObjectID{}
+	for _, id := range ids {
+		objID, e := primitive.ObjectIDFromHex(id)
+		if e == nil {
+			objIDs = append(objIDs, objID)
+		}
+	}
+
+	filter := bson.M{
+		"_id":       bson.M{"$in": objIDs},
+		"isDeleted": false,
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	result := make(map[string]models.Achievement)
+	for cursor.Next(ctx) {
+		var ach models.Achievement
+		if err := cursor.Decode(&ach); err == nil {
+			result[ach.ID.Hex()] = ach
+		}
+	}
+
+	return result, nil
+}
+
+// ================= UPDATE STATUS =================
+
+func (r *mongoAchievementRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"status":    status,
+			"updatedAt": time.Now(),
+		},
+	}
+
+	res, err := r.collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		return err
+	}
+
+	if res.MatchedCount == 0 {
+		return errors.New("achievement not found")
+	}
+
+	return nil
 }
