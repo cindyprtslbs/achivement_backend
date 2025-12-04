@@ -18,8 +18,7 @@ type MongoAchievementRepository interface {
 	GetAll(ctx context.Context) ([]models.Achievement, error)
 	GetByAdvisor(ctx context.Context, studentIDs []string) ([]models.Achievement, error)
 
-	CreateDraft(ctx context.Context, req *models.CreateAchievementRequest) (*models.Achievement, error)
-
+	CreateDraft(ctx context.Context, studentID string, req *models.CreateAchievementRequest) (*models.Achievement, error)
 	GetByID(ctx context.Context, id string) (*models.Achievement, error)
 	GetByStudentID(ctx context.Context, studentID string) ([]models.Achievement, error)
 
@@ -89,31 +88,32 @@ func (r *mongoAchievementRepository) GetByAdvisor(ctx context.Context, studentID
 }
 
 // ================= CREATE DRAFT =================
+func (r *mongoAchievementRepository) CreateDraft(ctx context.Context, studentID string, req *models.CreateAchievementRequest,) (*models.Achievement, error) {
 
-func (r *mongoAchievementRepository) CreateDraft(ctx context.Context, req *models.CreateAchievementRequest) (*models.Achievement, error) {
-	achievement := models.Achievement{
-		ID:              primitive.NewObjectID(),
-		StudentID:       req.StudentID,
-		AchievementType: req.AchievementType,
-		Title:           req.Title,
-		Description:     req.Description,
-		Details:         req.Details,
-		Attachments:     req.Attachments,
-		Tags:            req.Tags,
-		Points:          req.Points,
-		Status:          models.StatusDraft,
-		IsDeleted:       false,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-	}
+    achievement := models.Achievement{
+        ID:              primitive.NewObjectID(),
+        StudentID:       studentID, // <-- PENTING: bukan dari req
+        AchievementType: req.AchievementType,
+        Title:           req.Title,
+        Description:     req.Description,
+        Details:         req.Details,
+        Attachments:     req.Attachments,
+        Tags:            req.Tags,
+        Points:          req.Points,
+        Status:          models.StatusDraft,
+        IsDeleted:       false,
+        CreatedAt:       time.Now(),
+        UpdatedAt:       time.Now(),
+    }
 
-	_, err := r.collection.InsertOne(ctx, achievement)
-	if err != nil {
-		return nil, err
-	}
+    _, err := r.collection.InsertOne(ctx, achievement)
+    if err != nil {
+        return nil, err
+    }
 
-	return &achievement, nil
+    return &achievement, nil
 }
+
 
 // ================= GET BY ID =================
 

@@ -3,7 +3,6 @@ package service
 import (
 	"achievement_backend/app/repository"
 	"database/sql"
-	"log"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -127,10 +126,10 @@ func (s *AchievementReferenceService) Create(c *fiber.Ctx) error {
 
 // ================= SUBMIT =================
 func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
-    refID := c.Params("ref_id")
+    mongoID := c.Params("id") // ID dari route = MONGO ID
 
-    // get reference by ref_id
-    ref, err := s.repo.GetByID(refID)
+    // Cari reference melalui mongo_id
+    ref, err := s.repo.GetByMongoAchievementID(mongoID)
     if err != nil {
         return c.Status(500).JSON(fiber.Map{"error": "failed to get reference"})
     }
@@ -138,7 +137,7 @@ func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
         return c.Status(404).JSON(fiber.Map{"error": "reference not found"})
     }
 
-    // submit in postgres
+    // Submit di Postgres
     if err := s.repo.Submit(ref.ID); err != nil {
         if err == sql.ErrNoRows {
             return c.Status(400).JSON(fiber.Map{"error": "only draft achievements can be submitted"})
@@ -146,58 +145,43 @@ func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
         return c.Status(500).JSON(fiber.Map{"error": "failed to submit"})
     }
 
-    // update mongo
-    mongoID := ref.MongoAchievementID
+    // Update status achievement di Mongo
     _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "submitted")
 
-    return c.JSON(fiber.Map{"success": true})
+    return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Berhasil submit achievement",
+	})
 }
 
 // ================= VERIFY =================
 func (s *AchievementReferenceService) Verify(c *fiber.Ctx) error {
-    // AMBIL ref_id dari route
-    refID := c.Params("ref_id")
-    if refID == "" {
-        return c.Status(400).JSON(fiber.Map{"error": "reference id is required"})
-    }
-
+    mongoID := c.Params("id")
     verifierID := c.Locals("user_id").(string)
 
-    // Ambil reference berdasarkan ref_id (Postgres)
-    ref, err := s.repo.GetByID(refID)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return c.Status(404).JSON(fiber.Map{"error": "reference not found"})
-        }
-        return c.Status(500).JSON(fiber.Map{"error": "failed to fetch reference"})
+    // Cari reference berdasarkan MONGO ID
+    ref, err := s.repo.GetByMongoAchievementID(mongoID)
+    if err != nil || ref == nil {
+        return c.Status(404).JSON(fiber.Map{"error": "reference not found"})
     }
 
-    // Update status di PostgreSQL
-    if err := s.repo.Verify(refID, verifierID); err != nil {
-        if err == sql.ErrNoRows {
-            return c.Status(400).JSON(fiber.Map{"error": "only submitted achievements can be verified"})
-        }
-        return c.Status(500).JSON(fiber.Map{"error": "failed to verify reference"})
+    // Update reference ke verified
+    if err := s.repo.Verify(ref.ID, verifierID); err != nil {
+        return c.Status(400).JSON(fiber.Map{"error": "only submitted achievements can be verified"})
     }
 
-    // Update status di Mongo
-    if err := s.mongoRepo.UpdateStatus(c.Context(), ref.MongoAchievementID, "verified"); err != nil {
-        log.Printf("[WARN] Failed updating mongo achievement: %v", err)
-    }
+    // Update status di MongoDB
+    _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "verified")
 
     return c.JSON(fiber.Map{
-        "success": true,
-        "message": "achievement verified",
-    })
+		"success": true,
+		"message": "Berhasil verify achievement",
+	})
 }
 
 // ================= REJECT =================
 func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
-    refID := c.Params("ref_id")
-    if refID == "" {
-        return c.Status(400).JSON(fiber.Map{"error": "reference id is required"})
-    }
-
+    mongoID := c.Params("id")
     verifierID := c.Locals("user_id").(string)
 
     var req struct {
@@ -207,53 +191,21 @@ func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
         return c.Status(400).JSON(fiber.Map{"error": "rejection_note required"})
     }
 
-    ref, err := s.repo.GetByID(refID)
-    if err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "failed to get reference"})
-    }
-    if ref == nil {
+    ref, err := s.repo.GetByMongoAchievementID(mongoID)
+    if err != nil || ref == nil {
         return c.Status(404).JSON(fiber.Map{"error": "reference not found"})
     }
 
-    // Update Postgres
+    // Reject reference
     if err := s.repo.Reject(ref.ID, verifierID, req.RejectionNote); err != nil {
-        if err == sql.ErrNoRows {
-            return c.Status(400).JSON(fiber.Map{"error": "only submitted achievements can be rejected"})
-        }
-        return c.Status(500).JSON(fiber.Map{"error": "failed to reject"})
+        return c.Status(400).JSON(fiber.Map{"error": "only submitted achievements can be rejected"})
     }
 
-    // Update MongoDB (FIXED)
-    if err := s.mongoRepo.UpdateStatus(c.Context(), ref.MongoAchievementID, "rejected"); err != nil {
-        log.Printf("[WARN] Mongo update failed: %v", err)
-    }
+    // Update Mongo
+    _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "rejected")
 
-    return c.JSON(fiber.Map{"success": true})
-}
-
-// ================= DELETE =================
-func (s *AchievementReferenceService) SoftDelete(c *fiber.Ctx) error {
-	mongoID := c.Params("id")
-
-	ref, err := s.repo.GetByMongoAchievementID(mongoID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get reference"})
-	}
-	if ref == nil {
-		return c.Status(404).JSON(fiber.Map{"error": "reference not found"})
-	}
-
-	if err := s.repo.SoftDelete(ref.ID); err != nil {
-		if err == sql.ErrNoRows {
-			return c.Status(400).JSON(fiber.Map{"error": "only draft achievements can be deleted"})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete"})
-	}
-
-	// Update MongoDB
-	if err := s.mongoRepo.UpdateStatus(c.Context(), mongoID, "deleted"); err != nil {
-		log.Printf("[WARN] Mongo update failed: %v", err)
-	}
-
-	return c.JSON(fiber.Map{"success": true})
+    return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Berhasil reject achievement",
+	})
 }

@@ -249,11 +249,11 @@ func (s *AchievementMongoService) ListByRole(c *fiber.Ctx) error {
 // 2. GET DETAIL -- gabungkan reference (postgres) + detail (mongo)
 // ===========================================================
 func (s *AchievementMongoService) GetDetail(c *fiber.Ctx) error {
-	mongo_id := c.Params("id")
+	MongoAchievementID := c.Params("id")
 	ctx := c.Context()
 
 	// Ambil detail dari Mongo
-	item, err := s.mongoRepo.GetByID(ctx, mongo_id)
+	item, err := s.mongoRepo.GetByID(ctx, MongoAchievementID)
 	if err != nil {
 		log.Printf("[GetDetail] mongoRepo.GetByID error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch achievement detail"})
@@ -266,7 +266,7 @@ func (s *AchievementMongoService) GetDetail(c *fiber.Ctx) error {
 	}
 
 	// Ambil reference dari Postgres (bila ada)
-	ref, err := s.refRepo.GetByMongoAchievementID(mongo_id)
+	ref, err := s.refRepo.GetByMongoAchievementID(MongoAchievementID)
 	if err != nil {
 		// If not found, still return detail but warn
 		log.Printf("[GetDetail] refRepo.GetByMongoAchievementID error: %v", err)
@@ -294,44 +294,43 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid input"})
 	}
 
-	// Validate student exist
-	// Validate student exist by ID (UUID students table)
-	student, err := s.studentRepo.GetByID(req.StudentID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.Status(404).JSON(fiber.Map{"error": "student not found"})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch student"})
+	// Ambil user_id dari JWT
+	userID := c.Locals("user_id")
+	if userID == nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
-	if student == nil {
-		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
+	uid := userID.(string)
+
+	// Ambil student berdasarkan user_id (bukan dari req)
+	student, err := s.studentRepo.GetByUserID(uid)
+	if err != nil || student == nil {
+		return c.Status(403).JSON(fiber.Map{"error": "student profile not found"})
 	}
 
 	ctx := c.Context()
 
-	// Create in Mongo
-	created, err := s.mongoRepo.CreateDraft(ctx, &req)
+	// Create draft di Mongo (tanpa student_id dari req)
+	created, err := s.mongoRepo.CreateDraft(ctx, student.ID, &req)
 	if err != nil {
 		log.Printf("[CreateDraft] mongoRepo.CreateDraft error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create draft"})
 	}
 
-	mongoID := created.ID.Hex()
+	MongoAchievementID := created.ID.Hex()
 
-	// Create reference in Postgres - if fail, compensate by deleting Mongo doc
-	ref, err := s.refRepo.Create(student.ID, mongoID)
+	// Buat reference di PostgreSQL
+	ref, err := s.refRepo.Create(student.ID, MongoAchievementID)
 	if err != nil {
 		log.Printf("[CreateDraft] refRepo.Create error: %v", err)
-		// compensate: soft-delete or delete the mongo document to avoid orphan
-		_ = s.mongoRepo.SoftDelete(ctx, mongoID)
+		_ = s.mongoRepo.SoftDelete(ctx, MongoAchievementID) // rollback mongo
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create reference, draft rolled back"})
 	}
 
 	return c.Status(201).JSON(fiber.Map{
-		"success":      true,
-		"mongo_id":     mongoID,
-		"reference_id": ref.ID,
-		"detail":       created,
+		"success":              true,
+		"mongo_achievement_id": MongoAchievementID,
+		"reference_id":         ref.ID,
+		"detail":               created,
 	})
 }
 
@@ -382,7 +381,7 @@ func (s *AchievementMongoService) UpdateDraft(c *fiber.Ctx) error {
 // ===========================================================
 // 5. DELETE DRAFT (FR-005) -- perbaikan: ownership + sync with reference
 // ===========================================================
-func (s *AchievementMongoService) DeleteDraft(c *fiber.Ctx) error {
+func (s *AchievementMongoService) SoftDelete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	ctx := c.Context()
 
@@ -442,7 +441,7 @@ func (s *AchievementMongoService) DeleteDraft(c *fiber.Ctx) error {
 // 6. UPDATE ATTACHMENTS (FR-006) -- perbaikan: ownership + only draft
 // ===========================================================
 func (s *AchievementMongoService) UpdateAttachments(c *fiber.Ctx) error {
-	id := c.Params("mongo_id")
+	id := c.Params("id")
 	ctx := c.Context()
 
 	// ownership check

@@ -53,22 +53,14 @@ func SetupRoutes(
 	ach.Get("/:id", middleware.PermissionRequired("achievement:read"), achievementService.GetDetail)
 	ach.Post("/", middleware.PermissionRequired("achievement:create"), achievementService.CreateDraft)
 	ach.Put("/:id", middleware.PermissionRequired("achievement:update"), achievementService.UpdateDraft)
-	ach.Delete("/:id", middleware.PermissionRequired("achievement:delete"), achievementService.DeleteDraft)
+	ach.Delete("/:id", middleware.PermissionRequired("achievement:delete"), achievementService.SoftDelete)
 	ach.Post("/:id/attachments", middleware.PermissionRequired("achievement:update"), achievementService.UpdateAttachments)
 	ach.Get("/:id/history", middleware.PermissionRequired("achievement:read"), achievementHistoryService.GetHistory)
 
-	// ============= ACHIEVEMENT REFERENCES (PostgreSQL) =============
-	refs := v1.Group("/achievement-references")
-
-	refs.Get("/", middleware.PermissionRequired("achievement:read"), achievementRefService.GetAll)
-	refs.Get("/:ref_id", middleware.PermissionRequired("achievement:read"), achievementRefService.GetByID)
-	refs.Get("/student/:student_id", middleware.PermissionRequired("achievement:read"), achievementRefService.GetByStudent)
-
 	// status actions
-	ach.Post("/:ref_id/submit", middleware.PermissionRequired("achievement:submit"), achievementRefService.Submit)
-	ach.Post("/:ref_id/verify", middleware.PermissionRequired("achievement:verify"), achievementRefService.Verify)
-	ach.Post("/:ref_id/reject", middleware.PermissionRequired("achievement:reject"), achievementRefService.Reject)
-	ach.Delete("/:ref_id", middleware.PermissionRequired("achievement:delete"), achievementRefService.SoftDelete)
+	ach.Post("/:id/submit", middleware.PermissionRequired("achievement:submit"), achievementRefService.Submit)
+	ach.Post("/:id/verify", middleware.PermissionRequired("achievement:verify"), achievementRefService.Verify)
+	ach.Post("/:id/reject", middleware.PermissionRequired("achievement:reject"), achievementRefService.Reject)
 
 	// REPORTS
 	reports := v1.Group("/reports")
@@ -85,7 +77,5 @@ func SetupRoutes(
 	// LECTURERS
 	lecturers := v1.Group("/lecturers")
 	lecturers.Get("/", middleware.PermissionRequired("lecturer:read"), lecturerService.GetAll)
-	lecturers.Get("/:id", middleware.PermissionRequired("lecturer:read"), lecturerService.GetByID)
-	lecturers.Get("/:id/advisees", middleware.PermissionRequired("lecturer:read"), lecturerService.GetAdvisees)
-	lecturers.Get("/:id/advisees/achievements", middleware.PermissionRequired("achievement:read"), lecturerService.GetAdviseesAchievements)
+	lecturers.Get("/:id/advisees", middleware.PermissionRequired("lecturer:advisees"), lecturerService.GetAdvisees)
 }

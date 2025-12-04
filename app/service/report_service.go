@@ -1,204 +1,224 @@
 package service
 
 import (
-	"achievement_backend/app/repository"
-	"database/sql"
-	"log"
+    "sort"
 
-	"github.com/gofiber/fiber/v2"
+    model "achievement_backend/app/model"
+    "achievement_backend/app/repository"
+
+    "github.com/gofiber/fiber/v2"
 )
 
 type ReportService struct {
-	refRepo      repository.AchievementReferenceRepository
-	studentRepo  repository.StudentRepository
-	lecturerRepo repository.LecturerRepository
-	mongoRepo    repository.MongoAchievementRepository
-	userRepo     repository.UserRepository
+    refRepo      repository.AchievementReferenceRepository
+    studentRepo  repository.StudentRepository
+    lecturerRepo repository.LecturerRepository
+    mongoRepo    repository.MongoAchievementRepository
+    userRepo     repository.UserRepository
 }
 
 func NewReportService(
-	refRepo repository.AchievementReferenceRepository,
-	studentRepo repository.StudentRepository,
-	lecturerRepo repository.LecturerRepository,
-	mongoRepo repository.MongoAchievementRepository,
-	userRepo repository.UserRepository,
+    refRepo repository.AchievementReferenceRepository,
+    studentRepo repository.StudentRepository,
+    lecturerRepo repository.LecturerRepository,
+    mongoRepo repository.MongoAchievementRepository,
+    userRepo repository.UserRepository,
 ) *ReportService {
-	return &ReportService{
-		refRepo:      refRepo,
-		studentRepo:  studentRepo,
-		lecturerRepo: lecturerRepo,
-		mongoRepo:    mongoRepo,
-		userRepo:     userRepo,
-	}
+    return &ReportService{
+        refRepo:      refRepo,
+        studentRepo:  studentRepo,
+        lecturerRepo: lecturerRepo,
+        mongoRepo:    mongoRepo,
+        userRepo:     userRepo,
+    }
 }
 
-type StatisticsData struct {
-	Total       int64 `json:"total"`
-	Verified    int64 `json:"verified"`
-	Rejected    int64 `json:"rejected"`
-	Pending     int64 `json:"pending"`
-	Draft       int64 `json:"draft"`
-	TotalPoints int64 `json:"total_points"`
+type StatisticsOutput struct {
+	Total             int64            `json:"total"`
+	PerType           map[string]int64 `json:"per_type"`
+	PerMonth          map[string]int64 `json:"per_month"`
+	CompetitionLevels map[string]int64 `json:"competition_levels"`
+	TopStudents       []TopStudent     `json:"top_students"`
 }
 
-type StudentReportDetail struct {
-	StudentID      string  `json:"student_id"`
-	StudentName    string  `json:"student_name"`
-	Total          int64   `json:"total"`
-	Verified       int64   `json:"verified"`
-	Rejected       int64   `json:"rejected"`
-	Pending        int64   `json:"pending"`
-	Draft          int64   `json:"draft"`
-	TotalPoints    int64   `json:"total_points"`
-	VerifiedPoints int64   `json:"verified_points"`
-	RejectionRate  float64 `json:"rejection_rate"`
-	CompletionRate float64 `json:"completion_rate"`
+type TopStudent struct {
+	StudentID string `json:"student_id"`
+	Name      string `json:"name"`
+	Points    int64  `json:"points"`
 }
 
-// ================= GET STATISTICS =================
-// GetStatistics returns overall analytics
 func (s *ReportService) GetStatistics(c *fiber.Ctx) error {
-	log.Printf("[REPORT] Getting overall statistics")
+	role := c.Locals("role_name").(string)
+	userID := c.Locals("user_id").(string)
 
-	// Get all achievement references
-	allRefs, err := s.refRepo.GetAll()
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":  "failed to fetch statistics",
-			"detail": err.Error(),
-		})
-	}
+	var refs []model.AchievementReference
+	var total int64
+	var err error
 
-	stats := StatisticsData{}
-	totalPoints := int64(0)
+	limit := 1_000_000
+	offset := 0
 
-	// Count statuses
-	for _, ref := range allRefs {
-		stats.Total++
-
-		switch ref.Status {
-		case "verified":
-			stats.Verified++
-		case "rejected":
-			stats.Rejected++
-		case "submitted":
-			stats.Pending++
-		case "draft":
-			stats.Draft++
-		}
-
-		// Get MongoDB detail for points
-		if mongoDoc, err := s.mongoRepo.GetByID(c.Context(), ref.MongoAchievementID); err == nil {
-			if mongoDoc != nil && mongoDoc.Points != nil && *mongoDoc.Points > 0 {
-				totalPoints += int64(*mongoDoc.Points)
-			}
+	// ADMIN — full access
+	if role == "Admin" {
+		refs, total, err = s.refRepo.GetAllWithPagination(limit, offset)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch data"})
 		}
 	}
 
-	stats.TotalPoints = totalPoints
-
-	log.Printf("[REPORT] Statistics: Total=%d, Verified=%d, Rejected=%d, Pending=%d, Draft=%d, TotalPoints=%d",
-		stats.Total, stats.Verified, stats.Rejected, stats.Pending, stats.Draft, stats.TotalPoints)
-
-	return c.JSON(fiber.Map{
-		"data":    stats,
-		"success": true,
-	})
-}
-
-// ================= GET STUDENT REPORT =================
-// GetStudentReport returns detailed report for a specific student
-func (s *ReportService) GetStudentReport(c *fiber.Ctx) error {
-	studentID := c.Params("id")
-
-	if studentID == "" {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "student id is required",
-		})
-	}
-
-	log.Printf("[REPORT] Getting student report for: %s", studentID)
-
-	// Get student details
-	student, err := s.studentRepo.GetByID(studentID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.Status(404).JSON(fiber.Map{
-				"error": "student not found",
-			})
+	// DOSEN WALI — only advisees
+	if role == "Dosen Wali" {
+		lect, _ := s.lecturerRepo.GetByUserID(userID)
+		if lect == nil {
+			return c.Status(403).JSON(fiber.Map{"error": "lecturer not found"})
 		}
-		return c.Status(500).JSON(fiber.Map{
-			"error":  "failed to fetch student",
-			"detail": err.Error(),
-		})
+
+		advisees, _ := s.studentRepo.GetByAdvisorID(lect.ID)
+		ids := []string{}
+		for _, s := range advisees {
+			ids = append(ids, s.ID)
+		}
+
+		refs, total, err = s.refRepo.GetByAdviseesWithPagination(ids, limit, offset)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch data"})
+		}
 	}
 
-	// Get all achievement references for this student
-	refs, err := s.refRepo.GetByStudentID(studentID)
-	if err != nil && err != sql.ErrNoRows {
-		return c.Status(500).JSON(fiber.Map{
-			"error":  "failed to fetch achievements",
-			"detail": err.Error(),
-		})
+	// MAHASISWA — only own achievement
+	if role == "Mahasiswa" {
+		stu, _ := s.studentRepo.GetByUserID(userID)
+		if stu == nil {
+			return c.Status(403).JSON(fiber.Map{"error": "student not found"})
+		}
+
+		refs, err = s.refRepo.GetByStudentID(stu.ID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch data"})
+		}
+		total = int64(len(refs))
 	}
 
-	// Get user info for name
-	user, err := s.userRepo.GetByID(student.UserID)
-	if err != nil {
-		log.Printf("[REPORT] Warning: could not fetch user %s: %v", student.UserID, err)
+	// ——————————————————
+	// BUILD STATISTICS
+	// ——————————————————
+	output := StatisticsOutput{
+		Total:             total,
+		PerType:           map[string]int64{},
+		PerMonth:          map[string]int64{},
+		CompetitionLevels: map[string]int64{},
+		TopStudents:       []TopStudent{},
 	}
 
-	report := StudentReportDetail{
-		StudentID:   student.StudentID,
-		StudentName: "",
-	}
-	if user != nil {
-		report.StudentName = user.FullName
-	}
+	pointsMap := map[string]int64{}
 
-	verifiedPoints := int64(0)
-	totalPoints := int64(0)
-
-	// Count statuses and calculate points
 	for _, ref := range refs {
-		report.Total++
-
-		switch ref.Status {
-		case "verified":
-			report.Verified++
-		case "rejected":
-			report.Rejected++
-		case "submitted":
-			report.Pending++
-		case "draft":
-			report.Draft++
+		mg, err := s.mongoRepo.GetByID(c.Context(), ref.MongoAchievementID)
+		if err != nil || mg == nil {
+			continue
 		}
 
-		// Get MongoDB detail for points
-		if mongoDoc, err := s.mongoRepo.GetByID(c.Context(), ref.MongoAchievementID); err == nil {
-			if mongoDoc != nil && mongoDoc.Points != nil && *mongoDoc.Points > 0 {
-				totalPoints += int64(*mongoDoc.Points)
-				if ref.Status == "verified" {
-					verifiedPoints += int64(*mongoDoc.Points)
-				}
-			}
+		output.PerType[mg.AchievementType]++
+
+		month := ref.CreatedAt.Format("2006-01")
+		output.PerMonth[month]++
+
+		level := "unknown"
+		if mg.Details.CompetitionLevel != nil {
+			level = *mg.Details.CompetitionLevel
+		}
+		output.CompetitionLevels[level]++
+
+		if mg.Points != nil {
+			pointsMap[ref.StudentID] += int64(*mg.Points)
 		}
 	}
 
-	report.TotalPoints = totalPoints
-	report.VerifiedPoints = verifiedPoints
-
-	// Calculate rates
-	if report.Total > 0 {
-		report.RejectionRate = float64(report.Rejected) / float64(report.Total) * 100
-		report.CompletionRate = float64(report.Verified) / float64(report.Total) * 100
+	// ranking
+	type kv struct {
+		ID     string
+		Points int64
 	}
 
-	log.Printf("[REPORT] Student %s report: Total=%d, Verified=%d, Rejected=%d, Points=%d/%d",
-		studentID, report.Total, report.Verified, report.Rejected, report.VerifiedPoints, report.TotalPoints)
+	var sorted []kv
+	for id, pts := range pointsMap {
+		sorted = append(sorted, kv{id, pts})
+	}
+
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Points > sorted[j].Points
+	})
+
+	for i, st := range sorted {
+		if i >= 10 {
+			break
+		}
+
+		stuObj, _ := s.studentRepo.GetByID(st.ID)
+		user, _ := s.userRepo.GetByID(stuObj.UserID)
+
+		name := "Unknown"
+		if user != nil {
+			name = user.FullName
+		}
+
+		output.TopStudents = append(output.TopStudents, TopStudent{
+			StudentID: st.ID,
+			Name:      name,
+			Points:    st.Points,
+		})
+	}
 
 	return c.JSON(fiber.Map{
-		"data":    report,
 		"success": true,
+		"data":    output,
 	})
 }
+
+func (s *ReportService) GetStudentReport(c *fiber.Ctx) error {
+	role := c.Locals("role_name").(string)
+	userID := c.Locals("user_id").(string)
+	targetStudentID := c.Params("id")
+
+	// Mahasiswa → hanya miliknya sendiri
+	if role == "Mahasiswa" {
+		stu, _ := s.studentRepo.GetByUserID(userID)
+		if stu == nil || stu.ID != targetStudentID {
+			return c.Status(403).JSON(fiber.Map{"error": "access denied"})
+		}
+	}
+
+	// Dosen Wali → hanya advisee
+	if role == "Dosen Wali" {
+		lect, _ := s.lecturerRepo.GetByUserID(userID)
+		if lect == nil {
+			return c.Status(403).JSON(fiber.Map{"error": "lecturer not found"})
+		}
+
+		advisees, _ := s.studentRepo.GetByAdvisorID(lect.ID)
+		allowed := false
+		for _, a := range advisees {
+			if a.ID == targetStudentID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(403).JSON(fiber.Map{"error": "access denied"})
+		}
+	}
+
+	// Admin → skip restriction
+
+	data, err := s.refRepo.GetByStudentID(targetStudentID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch data"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    data,
+	})
+}
+
+
