@@ -18,11 +18,11 @@ type MongoAchievementRepository interface {
 	GetAll(ctx context.Context) ([]models.Achievement, error)
 	GetByAdvisor(ctx context.Context, studentIDs []string) ([]models.Achievement, error)
 
-	CreateDraft(ctx context.Context, studentID string, req *models.CreateAchievementRequest) (*models.Achievement, error)
+	CreateDraft(ctx context.Context, studentID string, req *models.CreateAchievementRequest, points int) (*models.Achievement, error)
 	GetByID(ctx context.Context, id string) (*models.Achievement, error)
 	GetByStudentID(ctx context.Context, studentID string) ([]models.Achievement, error)
 
-	UpdateDraft(ctx context.Context, id string, req *models.UpdateAchievementRequest) (*models.Achievement, error)
+	UpdateDraft(ctx context.Context, id string, req *models.UpdateAchievementRequest, points int) (*models.Achievement, error)
 	UpdateAttachments(ctx context.Context, id string, attachments []models.Attachment) (*models.Achievement, error)
 
 	SoftDelete(ctx context.Context, id string) error
@@ -88,18 +88,26 @@ func (r *mongoAchievementRepository) GetByAdvisor(ctx context.Context, studentID
 }
 
 // ================= CREATE DRAFT =================
-func (r *mongoAchievementRepository) CreateDraft(ctx context.Context, studentID string, req *models.CreateAchievementRequest,) (*models.Achievement, error) {
+func (r *mongoAchievementRepository) CreateDraft(
+    ctx context.Context,
+    studentID string,
+    req *models.CreateAchievementRequest,
+    points int,
+) (*models.Achievement, error) {
+
+    // convert int → *float64 (sesuaikan tipe model kamu)
+    p := float64(points)
 
     achievement := models.Achievement{
         ID:              primitive.NewObjectID(),
-        StudentID:       studentID, // <-- PENTING: bukan dari req
+        StudentID:       studentID,
         AchievementType: req.AchievementType,
         Title:           req.Title,
         Description:     req.Description,
         Details:         req.Details,
         Attachments:     req.Attachments,
         Tags:            req.Tags,
-        Points:          req.Points,
+        Points:          &p,  // <-- FIX UTAMA
         Status:          models.StatusDraft,
         IsDeleted:       false,
         CreatedAt:       time.Now(),
@@ -118,42 +126,41 @@ func (r *mongoAchievementRepository) CreateDraft(ctx context.Context, studentID 
 // ================= GET BY ID =================
 
 func (r *mongoAchievementRepository) GetByID(ctx context.Context, id string) (*models.Achievement, error) {
-    var result models.Achievement
+	var result models.Achievement
 
-    // ======================================
-    // 1. Coba sebagai ObjectID
-    // ======================================
-    if oid, err := primitive.ObjectIDFromHex(id); err == nil {
-        err = r.collection.FindOne(ctx, bson.M{
-            "_id":       oid,
-            "isDeleted": false,
-        }).Decode(&result)
+	// ======================================
+	// 1. Coba sebagai ObjectID
+	// ======================================
+	if oid, err := primitive.ObjectIDFromHex(id); err == nil {
+		err = r.collection.FindOne(ctx, bson.M{
+			"_id":       oid,
+			"isDeleted": false,
+		}).Decode(&result)
 
-        if err == nil {
-            return &result, nil
-        }
+		if err == nil {
+			return &result, nil
+		}
 
-        // Kalau err == ErrNoDocuments → lanjut ke string mode
-        if !errors.Is(err, mongo.ErrNoDocuments) {
-            return nil, err
-        }
-    }
+		// Kalau err == ErrNoDocuments → lanjut ke string mode
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, err
+		}
+	}
 
-    // ======================================
-    // 2. Fallback: cari _id STRING
-    // ======================================
-    err := r.collection.FindOne(ctx, bson.M{
-        "_id":       id,
-        "isDeleted": false,
-    }).Decode(&result)
+	// ======================================
+	// 2. Fallback: cari _id STRING
+	// ======================================
+	err := r.collection.FindOne(ctx, bson.M{
+		"_id":       id,
+		"isDeleted": false,
+	}).Decode(&result)
 
-    if errors.Is(err, mongo.ErrNoDocuments) {
-        return nil, nil
-    }
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
 
-    return &result, err
+	return &result, err
 }
-
 
 // ================= LIST BY STUDENT =================
 
@@ -179,7 +186,7 @@ func (r *mongoAchievementRepository) GetByStudentID(ctx context.Context, student
 
 // ================= UPDATE DRAFT =================
 
-func (r *mongoAchievementRepository) UpdateDraft(ctx context.Context, id string, req *models.UpdateAchievementRequest) (*models.Achievement, error) {
+func (r *mongoAchievementRepository) UpdateDraft(ctx context.Context, id string, req *models.UpdateAchievementRequest, points int) (*models.Achievement, error) {
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -199,7 +206,7 @@ func (r *mongoAchievementRepository) UpdateDraft(ctx context.Context, id string,
 			"details":         req.Details,
 			"attachments":     req.Attachments,
 			"tags":            req.Tags,
-			"points":          req.Points,
+			"points":          points,
 			"updatedAt":       time.Now(),
 		},
 	}

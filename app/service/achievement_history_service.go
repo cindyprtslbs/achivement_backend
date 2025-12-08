@@ -2,7 +2,6 @@ package service
 
 import (
 	"achievement_backend/app/repository"
-	"database/sql"
 	"log"
 	"time"
 
@@ -33,7 +32,6 @@ type HistoryEvent struct {
 }
 
 // ================= GET HISTORY =================
-// GetHistory returns status history for an achievement
 func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 	mongoAchievementID := c.Params("id")
 
@@ -48,28 +46,30 @@ func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 	// Get achievement reference
 	ref, err := s.refRepo.GetByMongoAchievementID(mongoAchievementID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return c.Status(404).JSON(fiber.Map{
-				"error": "achievement not found",
-			})
-		}
 		return c.Status(500).JSON(fiber.Map{
 			"error":  "failed to fetch achievement",
 			"detail": err.Error(),
 		})
 	}
 
-	// Build history from reference
+	// If not found
+	if ref == nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "achievement not found",
+		})
+	}
+
+	// Build history
 	history := []HistoryEvent{}
 
-	// Event 1: Created (draft)
+	// 1. Created (draft)
 	history = append(history, HistoryEvent{
 		Status:      "draft",
 		Timestamp:   ref.CreatedAt,
 		Description: "Achievement created as draft",
 	})
 
-	// Event 2: Submitted
+	// 2. Submitted
 	if ref.SubmittedAt != nil {
 		history = append(history, HistoryEvent{
 			Status:      "submitted",
@@ -78,16 +78,18 @@ func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	// Event 3: Verified or Rejected
+	// 3. Verified or Rejected
 	if ref.VerifiedAt != nil {
-		if ref.Status == "verified" {
+		switch ref.Status {
+		case "verified":
 			history = append(history, HistoryEvent{
 				Status:      "verified",
 				Timestamp:   *ref.VerifiedAt,
 				VerifiedBy:  ref.VerifiedBy,
 				Description: "Achievement verified by lecturer",
 			})
-		} else if ref.Status == "rejected" {
+
+		case "rejected":
 			history = append(history, HistoryEvent{
 				Status:        "rejected",
 				Timestamp:     *ref.VerifiedAt,
@@ -98,11 +100,21 @@ func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 		}
 	}
 
+	// 4. Deleted (soft delete)
+	if ref.Status == "deleted" {
+		history = append(history, HistoryEvent{
+			Status:      "deleted",
+			Timestamp:   ref.UpdatedAt,
+			Description: "Achievement was deleted by student",
+		})
+	}
+
 	log.Printf("[HISTORY] Retrieved %d history events", len(history))
 
 	return c.JSON(fiber.Map{
-		"data":    history,
-		"current": ref.Status,
 		"success": true,
+		"current": ref.Status,
+		"data":    history,
 	})
 }
+

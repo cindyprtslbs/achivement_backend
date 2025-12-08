@@ -45,11 +45,13 @@ func (s *StudentService) GetAll(c *fiber.Ctx) error {
 	)
 
 	switch role {
+
 	case "Admin":
 		students, err = s.repo.GetAll()
 
 	case "Dosen Wali":
-		lecturer, err := s.lecturerRepo.GetByUserID(uid)
+		var lecturer *models.Lecturer
+		lecturer, err = s.lecturerRepo.GetByUserID(uid) 
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturer"})
 		}
@@ -57,10 +59,11 @@ func (s *StudentService) GetAll(c *fiber.Ctx) error {
 			return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
 		}
 
-		// students, err = s.repo.GetByAdvisorID(lecturer.ID)
+		students, err = s.repo.GetByAdvisorID(lecturer.ID)
 
 	case "Mahasiswa":
-		student, _ := s.repo.GetByUserID(uid)
+		var student *models.Student
+		student, err = s.repo.GetByUserID(uid) 
 		if student != nil {
 			students = []models.Student{*student}
 		} else {
@@ -77,6 +80,7 @@ func (s *StudentService) GetAll(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true, "data": students})
 }
+
 
 // ======================================================
 // GET STUDENT BY ID

@@ -86,7 +86,6 @@ type CreateAchievementRequest struct {
 	Details         AchievementDetails `json:"details"`
 	Attachments     []Attachment       `json:"attachments"`
 	Tags            []string           `json:"tags"`
-	Points          *float64           `json:"points,omitempty"`
 }
 
 // ===============================================================
@@ -99,7 +98,6 @@ type UpdateAchievementRequest struct {
 	Details         AchievementDetails `json:"details"`
 	Attachments     []Attachment       `json:"attachments"`
 	Tags            []string           `json:"tags"`
-	Points          *float64           `json:"points,omitempty"`
 }
 
 // ===============================================================
