@@ -16,18 +16,21 @@ type User struct {
 }
 
 type CreateUserRequest struct {
-	ID           string `json:"id"`
-	Username     string `json:"username"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
-	FullName     string `json:"full_name"`
-	RoleID       string `json:"role_id"`
+	ID           string  `json:"id"`
+	Username     string  `json:"username"`
+	Email        string  `json:"email"`
+	PasswordHash string  `json:"password_hash"`
+	FullName     string  `json:"full_name"`
+	RoleID       *string `json:"role_id"`
 }
 
 type UpdateUserRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	FullName string `json:"full_name"`
-	RoleID   string `json:"role_id"`
-	IsActive bool   `json:"is_active"`
+	Username *string `json:"username"`
+	Email    *string `json:"email"`
+	FullName *string `json:"full_name"`
+	RoleID   *string `json:"role_id"`
+	IsActive *bool   `json:"is_active"`
+
+	Student  *SetStudentProfileRequest  `json:"student"`
+	Lecturer *SetLecturerProfileRequest `json:"lecturer"`
 }

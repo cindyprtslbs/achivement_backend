@@ -12,8 +12,8 @@ type UserRepository interface {
 	GetByEmail(email string) (*models.User, error)
 	GetByUsername(username string) (*models.User, error)
 	Create(req models.CreateUserRequest) (*models.User, error)
-	Update(id string, req models.UpdateUserRequest) (*models.User, error)
-	UpdatePassword(id string, passwordHash string) error 
+	UpdatePartial(u *models.User) (*models.User, error)
+	UpdatePassword(id string, passwordHash string) error
 	Delete(id string) error
 }
 
@@ -27,9 +27,8 @@ func NewUserRepository(db *sql.DB) UserRepository {
 
 func (r *userRepository) GetAll() ([]models.User, error) {
 	rows, err := r.db.Query(`
-	SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
-			u.role_id, COALESCE(r.name, '') AS role_name,
-			u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id, COALESCE(r.name, ''), u.is_active, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN roles r ON r.id = u.role_id
 		ORDER BY u.created_at DESC
@@ -42,15 +41,13 @@ func (r *userRepository) GetAll() ([]models.User, error) {
 	var list []models.User
 	for rows.Next() {
 		var u models.User
-		err := rows.Scan(
+		if err := rows.Scan(
 			&u.ID, &u.Username, &u.Email, &u.PasswordHash,
 			&u.FullName, &u.RoleID, &u.RoleName, &u.IsActive,
 			&u.CreatedAt, &u.UpdatedAt,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, err
 		}
-
 		list = append(list, u)
 	}
 
@@ -59,14 +56,11 @@ func (r *userRepository) GetAll() ([]models.User, error) {
 
 func (r *userRepository) GetByID(id string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT 
-			u.id, u.username, u.email, u.password_hash, u.full_name,
-			u.role_id,
-			COALESCE(r.name, '') AS role_name,
-			u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id, COALESCE(r.name, ''), u.is_active, u.created_at, u.updated_at
 		FROM users u
-		LEFT JOIN roles r ON u.role_id = r.id
-		WHERE u.id = $1
+		LEFT JOIN roles r ON r.id = u.role_id
+		WHERE u.id=$1
 	`, id)
 
 	var u models.User
@@ -84,13 +78,10 @@ func (r *userRepository) GetByID(id string) (*models.User, error) {
 
 func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT 
-			u.id, u.username, u.email, u.password_hash, u.full_name,
-			u.role_id,
-			COALESCE(r.name, '') AS role_name,
-			u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id, COALESCE(r.name, ''), u.is_active, u.created_at, u.updated_at
 		FROM users u
-		LEFT JOIN roles r ON u.role_id = r.id
+		LEFT JOIN roles r ON r.id = u.role_id
 		WHERE u.email=$1
 	`, email)
 
@@ -109,13 +100,10 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 
 func (r *userRepository) GetByUsername(username string) (*models.User, error) {
 	row := r.db.QueryRow(`
-		SELECT 
-			u.id, u.username, u.email, u.password_hash, u.full_name,
-			u.role_id,
-			COALESCE(r.name, '') AS role_name,
-			u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.username, u.email, u.password_hash, u.full_name,
+			u.role_id, COALESCE(r.name, ''), u.is_active, u.created_at, u.updated_at
 		FROM users u
-		LEFT JOIN roles r ON u.role_id = r.id
+		LEFT JOIN roles r ON r.id = u.role_id
 		WHERE u.username=$1
 	`, username)
 
@@ -133,79 +121,60 @@ func (r *userRepository) GetByUsername(username string) (*models.User, error) {
 }
 
 func (r *userRepository) Create(req models.CreateUserRequest) (*models.User, error) {
-	var id string
-	var isActive bool
-	var createdAt, updatedAt time.Time
+    var id string
+    var isActive bool
+    var createdAt, updatedAt time.Time
 
-	err := r.db.QueryRow(`
-		INSERT INTO users (username, email, password_hash, full_name)
-		VALUES ($1,$2,$3,$4)
-		RETURNING id, is_active, created_at, updated_at`,
-		req.Username,
-		req.Email,
-		req.PasswordHash,
-		req.FullName,
-	).Scan(&id, &isActive, &createdAt, &updatedAt)
+    err := r.db.QueryRow(`
+        INSERT INTO users (username, email, password_hash, full_name)
+        VALUES ($1,$2,$3,$4)
+        RETURNING id, is_active, created_at, updated_at`,
+        req.Username,
+        req.Email,
+        req.PasswordHash,
+        req.FullName,
+    ).Scan(&id, &isActive, &createdAt, &updatedAt)
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
-	return &models.User{
-		ID:           id,
-		Username:     req.Username,
-		Email:        req.Email,
-		PasswordHash: req.PasswordHash,
-		FullName:     req.FullName,
-		RoleID:       nil,
-		IsActive:     isActive,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
-	}, nil
+    return &models.User{
+        ID:           id,
+        Username:     req.Username,
+        Email:        req.Email,
+        PasswordHash: req.PasswordHash,
+        FullName:     req.FullName,
+        RoleID:       nil, 
+        IsActive:     isActive,
+        CreatedAt:    createdAt,
+        UpdatedAt:    updatedAt,
+    }, nil
 }
 
-func (r *userRepository) Update(id string, req models.UpdateUserRequest) (*models.User, error) {
-	var updatedAt time.Time
 
-	err := r.db.QueryRow(`
-		UPDATE users SET
-			username=$1,
-			email=$2,
-			full_name=$3,
-			role_id=$4,
-			is_active=$5,
-			updated_at=NOW()
+func (r *userRepository) UpdatePartial(u *models.User) (*models.User, error) {
+	_, err := r.db.Exec(`
+		UPDATE users SET 
+			username=$1, email=$2, full_name=$3, role_id=$4,
+			is_active=$5, updated_at=NOW()
 		WHERE id=$6
-		RETURNING updated_at`,
-		req.Username,
-		req.Email,
-		req.FullName,
-		req.RoleID,
-		req.IsActive,
-		id,
-	).Scan(&updatedAt)
+	`,
+		u.Username, u.Email, u.FullName, u.RoleID,
+		u.IsActive, u.ID,
+	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &models.User{
-		ID:        id,
-		Username:  req.Username,
-		Email:     req.Email,
-		FullName:  req.FullName,
-		RoleID:    &req.RoleID,
-		IsActive:  req.IsActive,
-		UpdatedAt: updatedAt,
-	}, nil
+	return r.GetByID(u.ID)
 }
 
 func (r *userRepository) UpdatePassword(id string, passwordHash string) error {
 	_, err := r.db.Exec(`
-		UPDATE users
-		SET password_hash = $1,
-			updated_at = NOW()
-		WHERE id = $2
+		UPDATE users SET password_hash=$1, updated_at=NOW()
+		WHERE id=$2
 	`, passwordHash, id)
 
 	return err
