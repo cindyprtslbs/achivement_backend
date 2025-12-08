@@ -135,51 +135,37 @@ func (s *UserService) Update(c *fiber.Ctx) error {
 	})
 }
 
-// =======================================================
-// UPDATE ROLE
-// =======================================================
-func (s *UserService) UpdateRole(c *fiber.Ctx) error {
+func (s *UserService) UpdatePassword(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	var body struct {
-		RoleID string `json:"role_id"`
+		Password string `json:"password"`
 	}
 
-	// Parse request
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
-	if body.RoleID == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "role_id is required"})
+	if body.Password == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "password is required"})
 	}
 
-	// Pastikan user ada
-	user, err := s.userRepo.GetByID(id)
-	if err != nil {
+	// cek user ada
+	if _, err := s.userRepo.GetByID(id); err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
 	}
 
-	// Pastikan role valid
-	_, err = s.roleRepo.GetByID(body.RoleID)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid role_id"})
-	}
+	// hash
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
 
-	// Update role
-	err = s.userRepo.UpdateRole(id, body.RoleID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to update user role"})
+	// update password
+	if err := s.userRepo.UpdatePassword(id, string(hashed)); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to update password"})
 	}
 
 	return c.JSON(fiber.Map{
 		"success": true,
-		"message": "user role updated",
-		"data": fiber.Map{
-			"user_id":  user.ID,
-			"old_role": user.RoleID,
-			"new_role": body.RoleID,
-		},
+		"message": "password updated",
 	})
 }
 

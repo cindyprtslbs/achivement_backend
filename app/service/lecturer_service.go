@@ -186,20 +186,6 @@ func (s *LecturerService) Update(c *fiber.Ctx) error {
 	})
 }
 
-// DELETE LECTURER (ADMIN)
-func (s *LecturerService) Delete(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	if err := s.repo.Delete(id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete lecturer"})
-	}
-
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "lecturer deleted",
-	})
-}
-
 // ============================================
 // GET ADVISEES (Mahasiswa Bimbingan Dosen)
 // GET /api/v1/lecturers/:id/advisees

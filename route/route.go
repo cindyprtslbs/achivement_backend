@@ -41,7 +41,7 @@ func SetupRoutes(
 	users.Post("/", middleware.PermissionRequired("user:create"), userService.Create)
 	users.Put("/:id", middleware.PermissionRequired("user:update"), userService.Update)
 	users.Delete("/:id", middleware.PermissionRequired("user:delete"), userService.Delete)
-	users.Put("/:id/role", middleware.PermissionRequired("user:update_role"), userService.UpdateRole)
+	users.Put("/:id/role", middleware.PermissionRequired("user:update_password"), userService.UpdatePassword)
 
 	users.Put("/:id/lecturer-profile", middleware.PermissionRequired("user:update"), lecturerService.SetLecturerProfile)
 	users.Put("/:id/student-profile", middleware.PermissionRequired("user:update"), studentService.SetStudentProfile)
