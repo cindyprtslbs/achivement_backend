@@ -177,48 +177,111 @@ func (s *ReportService) GetStatistics(c *fiber.Ctx) error {
 
 func (s *ReportService) GetStudentReport(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
-	userID := c.Locals("user_id").(string)
-	targetStudentID := c.Params("id")
+	loggedUID := c.Locals("user_id").(string)
+	studentID := c.Params("id")
 
-	// Mahasiswa → hanya miliknya sendiri
-	if role == "Mahasiswa" {
-		stu, _ := s.studentRepo.GetByUserID(userID)
-		if stu == nil || stu.ID != targetStudentID {
-			return c.Status(403).JSON(fiber.Map{"error": "access denied"})
-		}
+	// ========================
+	// 1. STUDENT
+	// ========================
+	student, err := s.studentRepo.GetByID(studentID)
+	if err != nil || student == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
 	}
 
-	// Dosen Wali → hanya advisee
-	if role == "Dosen Wali" {
-		lect, _ := s.lecturerRepo.GetByUserID(userID)
-		if lect == nil {
-			return c.Status(403).JSON(fiber.Map{"error": "lecturer not found"})
+	// ========================
+	// 2. RBAC
+	// ========================
+	switch role {
+
+	case "Mahasiswa":
+		if student.UserID != loggedUID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: access own report only",
+			})
 		}
 
-		advisees, _ := s.studentRepo.GetByAdvisorID(lect.ID)
-		allowed := false
-		for _, a := range advisees {
-			if a.ID == targetStudentID {
-				allowed = true
-				break
-			}
+	case "Dosen Wali":
+		lect, err := s.lecturerRepo.GetByUserID(loggedUID)
+		if err != nil || lect == nil || student.AdvisorID == nil || *student.AdvisorID != lect.ID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: not your advisee",
+			})
 		}
-		if !allowed {
-			return c.Status(403).JSON(fiber.Map{"error": "access denied"})
-		}
+
+	case "Admin":
+		// full access
+
+	default:
+		return c.Status(403).JSON(fiber.Map{"error": "invalid role"})
 	}
 
-	// Admin → skip restriction
-
-	data, err := s.refRepo.GetByStudentID(targetStudentID)
+	// ========================
+	// 3. ALL ACHIEVEMENTS (NO FILTER)
+	// ========================
+	refs, err := s.refRepo.GetByStudentID(studentID)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to fetch data"})
+		return c.Status(500).JSON(fiber.Map{
+			"error": "failed to fetch achievements",
+		})
 	}
 
+	// ========================
+	// 4. BUILD DATA
+	// ========================
+	var (
+		totalPoints int64 = 0
+		levels             = map[string]int{}
+		detailed           = []fiber.Map{}
+	)
+
+	for _, ref := range refs {
+		mg, err := s.mongoRepo.GetByID(c.Context(), ref.MongoAchievementID)
+		if err != nil || mg == nil {
+			continue // skip broken data
+		}
+
+		points := int64(0)
+		if mg.Points != nil {
+			points = int64(*mg.Points)
+			totalPoints += points
+		}
+
+		level := "unknown"
+		if mg.Details.CompetitionLevel != nil {
+			level = *mg.Details.CompetitionLevel
+		}
+		levels[level]++
+
+		detailed = append(detailed, fiber.Map{
+			"id":     ref.ID,
+			"title":  mg.Title,
+			"type":   mg.AchievementType,
+			"level":  level,
+			"status": ref.Status,
+			"points": points,
+		})
+	}
+
+	// ========================
+	// 5. RESPONSE
+	// ========================
 	return c.JSON(fiber.Map{
 		"success": true,
-		"data":    data,
+		"data": fiber.Map{
+			"student": fiber.Map{
+				"id":            student.ID,
+				"name":          student.FullName,
+				"student_id":    student.StudentID,
+				"program_study": student.ProgramStudy,
+				"academic_year": student.AcademicYear,
+			},
+			"summary": fiber.Map{
+				"total_achievements": len(detailed),
+				"total_points":       totalPoints,
+				"competition_levels": levels,
+			},
+			"achievements": detailed,
+		},
 	})
 }
-
 

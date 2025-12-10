@@ -93,6 +93,15 @@ func (s *LecturerService) GetAll(c *fiber.Ctx) error {
 func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
+	role := c.Locals("role_name").(string)
+	uid := c.Locals("user_id").(string)
+
+	if role == "Dosen Wali" && uid != userID {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden",
+		})
+	}
+
 	lecturer, err := s.repo.GetByUserID(userID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
@@ -104,96 +113,6 @@ func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 	})
 }
 
-// CREATE LECTURER (ADMIN)
-func (s *LecturerService) SetLecturerProfile(c *fiber.Ctx) error {
-	userId := c.Params("id")
-
-	loggedUserID := c.Locals("user_id").(string)
-	role := c.Locals("role_name").(string)
-
-	if role != "Admin" && loggedUserID != userId {
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden: cannot modify other user profile",
-		})
-	}
-
-	// Parse request
-	var req models.SetLecturerProfileRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
-	}
-
-	// 1. Check user exists
-	user, err := s.userRepo.GetByID(userId)
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "User not found")
-	}
-
-	// 2. Check role must be Dosen Wali
-	if user.RoleName != "Dosen Wali" {
-		return fiber.NewError(fiber.StatusBadRequest, "User is not assigned as Dosen Wali")
-	}
-
-	// 3. Check if lecturer profile exists
-	existing, err := s.repo.GetByUserID(userId)
-	if err != nil {
-		return fiber.ErrInternalServerError
-	}
-
-	// 4A. Update existing profile
-	if existing != nil {
-		updated, err := s.repo.Update(existing.ID, models.UpdateLecturerRequest{
-			LecturerID: req.LecturerID,
-			Department: req.Department,
-		})
-		if err != nil {
-			return fiber.ErrInternalServerError
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Lecturer profile updated successfully",
-			"data":    updated,
-		})
-	}
-
-	// 4B. Create new profile
-	created, err := s.repo.Create(models.CreateLecturerRequest{
-		UserID:     userId,
-		LecturerID: req.LecturerID,
-		Department: req.Department,
-	})
-	if err != nil {
-		return fiber.ErrInternalServerError
-	}
-
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "Lecturer profile created successfully",
-		"data":    created,
-	})
-}
-
-// UPDATE LECTURER (ADMIN)
-func (s *LecturerService) Update(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	var req models.UpdateLecturerRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-
-	lecturer, err := s.repo.Update(id, req)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to update lecturer"})
-	}
-
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "lecturer updated",
-		"data":    lecturer,
-	})
-}
 
 // ============================================
 // GET ADVISEES (Mahasiswa Bimbingan Dosen)
@@ -202,21 +121,24 @@ func (s *LecturerService) Update(c *fiber.Ctx) error {
 func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 	lecturerID := c.Params("id")
 
-	role := c.Locals("role_name").(string)
-	uid := c.Locals("user_id").(string)
+	role := c.Locals("role_name")
+	if role == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
-	if role == "Dosen Wali" {
-		lecturer, _ := s.repo.GetByUserID(uid)
-		if lecturer == nil || lecturer.ID != lecturerID {
-			return c.Status(403).JSON(fiber.Map{
-				"error": "forbidden: not your advisees",
-			})
-		}
+	if role.(string) != "Admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: admin only",
+		})
 	}
 
 	students, err := s.studentRepo.GetByAdvisorID(lecturerID)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get advisees"})
+		return c.Status(500).JSON(fiber.Map{
+			"error": "failed to get advisees",
+		})
 	}
 
 	return c.JSON(fiber.Map{
@@ -224,3 +146,4 @@ func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 		"data":    students,
 	})
 }
+

@@ -33,52 +33,64 @@ func (s *StudentService) GetAll(c *fiber.Ctx) error {
 	roleName := c.Locals("role_name")
 
 	if userID == nil || roleName == nil {
-		return c.Status(401).JSON(fiber.Map{"error": "unauthorized: missing session"})
+		return c.Status(401).JSON(fiber.Map{
+			"error": "unauthorized: missing session",
+		})
 	}
 
 	uid := userID.(string)
 	role := roleName.(string)
 
-	var (
-		students []models.Student
-		err      error
-	)
-
 	switch role {
 
 	case "Admin":
-		students, err = s.repo.GetAll()
+		students, err := s.repo.GetAll()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to get students",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    students,
+		})
 
 	case "Dosen Wali":
-		var lecturer *models.Lecturer
-		lecturer, err = s.lecturerRepo.GetByUserID(uid) 
+		lecturer, err := s.lecturerRepo.GetByUserID(uid)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturer"})
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to get lecturer",
+			})
 		}
 		if lecturer == nil {
-			return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
+			return c.Status(404).JSON(fiber.Map{
+				"error": "lecturer not found",
+			})
 		}
 
-		students, err = s.repo.GetByAdvisorID(lecturer.ID)
+		students, err := s.repo.GetByAdvisorID(lecturer.ID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to get advisees",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    students,
+		})
 
 	case "Mahasiswa":
-		var student *models.Student
-		student, err = s.repo.GetByUserID(uid) 
-		if student != nil {
-			students = []models.Student{*student}
-		} else {
-			students = []models.Student{}
-		}
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: mahasiswa tidak dapat mengakses daftar mahasiswa",
+		})
 
 	default:
-		return c.Status(403).JSON(fiber.Map{"error": "forbidden role"})
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden role",
+		})
 	}
-
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get students"})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "data": students})
 }
 
 
@@ -210,81 +222,5 @@ func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 		"success": true,
 		"message": "advisor updated successfully",
 		"data":    updated,
-	})
-}
-
-// ======================================================
-// SET STUDENT PROFILE (Mahasiswa Only, No Advisor)
-// ======================================================
-func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
-	userId := c.Params("id")
-
-	loggedUserID := c.Locals("user_id").(string)
-	role := c.Locals("role_name").(string)
-
-	if role != "Admin" && loggedUserID != userId {
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden: cannot modify other user profile",
-		})
-	}
-
-	var req models.SetStudentProfileRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
-	}
-
-	// Check user exists
-	user, err := s.userRepo.GetByID(userId)
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "User not found")
-	}
-
-	// Must be Mahasiswa
-	if user.RoleName != "Mahasiswa" {
-		return fiber.NewError(fiber.StatusBadRequest, "User is not Mahasiswa")
-	}
-
-	// Check existing profile
-	existing, err := s.repo.GetByUserID(userId)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	// UPDATE profile
-	if existing != nil {
-		updated, err := s.repo.Update(existing.ID, models.UpdateStudentRequest{
-			UserID:       userId,
-			StudentID:    req.StudentID,
-			ProgramStudy: req.ProgramStudy,
-			AcademicYear: req.AcademicYear,
-			AdvisorID:    existing.AdvisorID, // keep old advisor
-		})
-		if err != nil {
-			return fiber.ErrInternalServerError
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Student profile updated successfully",
-			"data":    updated,
-		})
-	}
-
-	// CREATE new profile
-	created, err := s.repo.Create(models.CreateStudentRequest{
-		UserID:       userId,
-		StudentID:    req.StudentID,
-		ProgramStudy: req.ProgramStudy,
-		AcademicYear: req.AcademicYear,
-		AdvisorID:    nil, // advisor belum di-set
-	})
-	if err != nil {
-		return fiber.ErrInternalServerError
-	}
-
-	return c.JSON(fiber.Map{
-		"success": true,
-		"message": "Student profile created successfully",
-		"data":    created,
 	})
 }
