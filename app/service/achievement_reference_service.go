@@ -148,9 +148,17 @@ func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
     // Update status achievement di Mongo
     _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "submitted")
 
+	// merge data
+	result := fiber.Map{
+		"id": ref.ID,
+		"status": ref.Status,
+		"submitted_at": ref.SubmittedAt,
+	}
+
     return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Berhasil submit achievement",
+		"data": result,
 	})
 }
 
@@ -173,9 +181,18 @@ func (s *AchievementReferenceService) Verify(c *fiber.Ctx) error {
     // Update status di MongoDB
     _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "verified")
 
+	// merge data
+	result := fiber.Map{
+		"id": ref.ID,
+		"status": ref.Status,
+		"verified_at": ref.VerifiedAt,
+		"verified_by": verifierID,
+	}
+
     return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Berhasil verify achievement",
+		"data": result,
 	})
 }
 
@@ -204,8 +221,16 @@ func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
     // Update Mongo
     _ = s.mongoRepo.UpdateStatus(c.Context(), mongoID, "rejected")
 
+	// merge data
+	result := fiber.Map{
+		"id": ref.ID,
+		"status": ref.Status,
+		"rejection_note": ref.RejectionNote,
+	}
+
     return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Berhasil reject achievement",
+		"data": result,
 	})
 }

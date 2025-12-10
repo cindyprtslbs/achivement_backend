@@ -10,7 +10,7 @@ func PermissionRequired(permission string) fiber.Handler {
 		perms := c.Locals("permissions")
 		if perms == nil {
 			return c.Status(401).JSON(fiber.Map{
-				"error": "unauthorized: missing permissions",
+				"error": "unauthorized: maaf, kamu nggak punya permission apapun",
 			})
 		}
 
@@ -24,7 +24,7 @@ func PermissionRequired(permission string) fiber.Handler {
 		}
 
 		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden: missing permission `" + permission + "`",
+			"error": "forbidden:  maaf, kamu nggak bisa akses `" + permission + "`",
 		})
 	}
 }
