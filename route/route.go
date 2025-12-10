@@ -36,15 +36,15 @@ func SetupRoutes(
 
 	// USERS
 	users := v1.Group("/users")
-	users.Get("/", middleware.PermissionRequired("user:read"), userService.GetAll)
-	users.Get("/:id", middleware.PermissionRequired("user:read"), userService.GetByID)
-	users.Post("/", middleware.PermissionRequired("user:create"), userService.Create)
-	users.Put("/:id", middleware.PermissionRequired("user:update"), userService.Update)
-	users.Delete("/:id", middleware.PermissionRequired("user:delete"), userService.Delete)
-	users.Put("/:id/role", middleware.PermissionRequired("user:update_password"), userService.UpdatePassword)
+	users.Get("/", middleware.PermissionRequired("user:manage"), userService.GetAll)
+	users.Get("/:id", middleware.PermissionRequired("user:manage"), userService.GetByID)
+	users.Post("/", middleware.PermissionRequired("user:manage"), userService.Create)
+	users.Put("/:id", middleware.PermissionRequired("user:manage"), userService.Update)
+	users.Delete("/:id", middleware.PermissionRequired("user:manage"), userService.Delete)
+	users.Put("/:id/role", middleware.PermissionRequired("user:manage"), userService.UpdatePassword)
 
-	users.Put("/:id/lecturer-profile", middleware.PermissionRequired("user:update"), lecturerService.SetLecturerProfile)
-	users.Put("/:id/student-profile", middleware.PermissionRequired("user:update"), studentService.SetStudentProfile)
+	users.Put("/:id/lecturer-profile", middleware.PermissionRequired("user:manage"), lecturerService.SetLecturerProfile)
+	users.Put("/:id/student-profile", middleware.PermissionRequired("user:manage"), studentService.SetStudentProfile)
 
 	// ============= ACHIEVEMENTS (Mongo) =============
 	ach := v1.Group("/achievements")

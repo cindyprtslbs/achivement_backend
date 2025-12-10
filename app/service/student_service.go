@@ -219,6 +219,15 @@ func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 func (s *StudentService) SetStudentProfile(c *fiber.Ctx) error {
 	userId := c.Params("id")
 
+	loggedUserID := c.Locals("user_id").(string)
+	role := c.Locals("role_name").(string)
+
+	if role != "Admin" && loggedUserID != userId {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: cannot modify other user profile",
+		})
+	}
+
 	var req models.SetStudentProfileRequest
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")

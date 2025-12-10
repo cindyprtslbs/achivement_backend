@@ -108,6 +108,15 @@ func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 func (s *LecturerService) SetLecturerProfile(c *fiber.Ctx) error {
 	userId := c.Params("id")
 
+	loggedUserID := c.Locals("user_id").(string)
+	role := c.Locals("role_name").(string)
+
+	if role != "Admin" && loggedUserID != userId {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: cannot modify other user profile",
+		})
+	}
+
 	// Parse request
 	var req models.SetLecturerProfileRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -192,6 +201,18 @@ func (s *LecturerService) Update(c *fiber.Ctx) error {
 // ============================================
 func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 	lecturerID := c.Params("id")
+
+	role := c.Locals("role_name").(string)
+	uid := c.Locals("user_id").(string)
+
+	if role == "Dosen Wali" {
+		lecturer, _ := s.repo.GetByUserID(uid)
+		if lecturer == nil || lecturer.ID != lecturerID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: not your advisees",
+			})
+		}
+	}
 
 	students, err := s.studentRepo.GetByAdvisorID(lecturerID)
 	if err != nil {
