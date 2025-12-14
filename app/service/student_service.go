@@ -26,86 +26,71 @@ func NewStudentService(
 }
 
 // ======================================================
-// GET ALL STUDENTS (Role Aware)
+// GET ALL STUDENTS (ONLY ADMIN)
 // ======================================================
 func (s *StudentService) GetAll(c *fiber.Ctx) error {
-	userID := c.Locals("user_id")
 	roleName := c.Locals("role_name")
-
-	if userID == nil || roleName == nil {
+	if roleName == nil {
 		return c.Status(401).JSON(fiber.Map{
-			"error": "unauthorized: missing session",
+			"error": "unauthorized",
 		})
 	}
 
-	uid := userID.(string)
 	role := roleName.(string)
 
-	switch role {
-
-	case "Admin":
-		students, err := s.repo.GetAll()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error": "failed to get students",
-			})
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"data":    students,
-		})
-
-	case "Dosen Wali":
-		lecturer, err := s.lecturerRepo.GetByUserID(uid)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error": "failed to get lecturer",
-			})
-		}
-		if lecturer == nil {
-			return c.Status(404).JSON(fiber.Map{
-				"error": "lecturer not found",
-			})
-		}
-
-		students, err := s.repo.GetByAdvisorID(lecturer.ID)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error": "failed to get advisees",
-			})
-		}
-
-		return c.JSON(fiber.Map{
-			"success": true,
-			"data":    students,
-		})
-
-	case "Mahasiswa":
+	// ================= ONLY ADMIN =================
+	if role != "Admin" {
 		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden: mahasiswa tidak dapat mengakses daftar mahasiswa",
-		})
-
-	default:
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden role",
+			"error": "forbidden: only admin can access this resource",
 		})
 	}
+
+	students, err := s.repo.GetAll()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "failed to get students",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    students,
+	})
 }
 
-
 // ======================================================
-// GET STUDENT BY ID
+// GET STUDENT BY ID (ONLY ADMIN)
 // ======================================================
 func (s *StudentService) GetByID(c *fiber.Ctx) error {
+	roleName := c.Locals("role_name")
+	if roleName == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	role := roleName.(string)
+
+	// ================= ONLY ADMIN =================
+	if role != "Admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: only admin can access student detail",
+		})
+	}
+
 	id := c.Params("id")
 
 	student, err := s.repo.GetByID(id)
 	if err != nil || student == nil {
-		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
+		return c.Status(404).JSON(fiber.Map{
+			"error": "student not found",
+		})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "data": student})
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    student,
+	})
 }
 
 // ======================================================
@@ -191,9 +176,25 @@ func (s *StudentService) Delete(c *fiber.Ctx) error {
 }
 
 // ======================================================
-// UPDATE ADVISOR ONLY
+// UPDATE ADVISOR (ADMIN ONLY)
 // ======================================================
 func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
+	roleName := c.Locals("role_name")
+	if roleName == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	role := roleName.(string)
+
+	// ================= ONLY ADMIN =================
+	if role != "Admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: only admin can update advisor",
+		})
+	}
+
 	id := c.Params("id")
 
 	type AdvisorRequest struct {
@@ -201,19 +202,24 @@ func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 	}
 
 	var req AdvisorRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	if err := c.BodyParser(&req); err != nil || req.AdvisorID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "advisor_id is required",
+		})
 	}
 
 	student, err := s.repo.GetByID(id)
 	if err != nil || student == nil {
-		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
+		return c.Status(404).JSON(fiber.Map{
+			"error": "student not found",
+		})
 	}
 
-	// update only advisor_id
-	err = s.repo.UpdateAdvisor(id, req.AdvisorID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to update advisor"})
+	// Update only advisor_id
+	if err := s.repo.UpdateAdvisor(id, req.AdvisorID); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "failed to update advisor",
+		})
 	}
 
 	updated, _ := s.repo.GetByID(id)

@@ -1,7 +1,6 @@
 package service
 
 import (
-	models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
 
 	"github.com/gofiber/fiber/v2"
@@ -39,53 +38,29 @@ func NewLecturerServiceWithDependencies(
     }
 }
 
-// GET ALL LECTURERS
+// GET ALL LECTURERS (ADMIN ONLY)
 func (s *LecturerService) GetAll(c *fiber.Ctx) error {
-    role := c.Locals("role_name")
-    userID := c.Locals("user_id")
+	role := c.Locals("role_name")
 
-    if role == nil || userID == nil {
-        return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
-    }
+	if role == nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 
-    r := role.(string)
-    uid := userID.(string)
+	if role.(string) != "Admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden: admin only",
+		})
+	}
 
-    switch r {
+	data, err := s.repo.GetAll()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturers"})
+	}
 
-    case "Admin":
-        // Admin melihat semua dosen
-        data, err := s.repo.GetAll()
-        if err != nil {
-            return c.Status(500).JSON(fiber.Map{"error": "failed to get lecturers"})
-        }
-        return c.JSON(fiber.Map{
-            "success": true,
-            "data":    data,
-        })
-
-    case "Dosen Wali":
-        // Dosen Wali hanya melihat dirinya sendiri
-        lecturer, err := s.repo.GetByUserID(uid)
-        if err != nil {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "failed to fetch lecturer profile",
-            })
-        }
-        if lecturer == nil {
-            return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
-        }
-
-        return c.JSON(fiber.Map{
-            "success": true,
-            "data":    []models.Lecturer{*lecturer}, 
-        })
-
-    default:
-        return c.Status(403).JSON(fiber.Map{
-            "error": "forbidden: role cannot access lecturer list",
-        })
-    }
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    data,
+	})
 }
 
 
@@ -113,37 +88,71 @@ func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
 	})
 }
 
-
 // ============================================
-// GET ADVISEES (Mahasiswa Bimbingan Dosen)
-// GET /api/v1/lecturers/:id/advisees
+// GET ADVISEES (ADMIN & DOSEN WALI)
 // ============================================
 func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 	lecturerID := c.Params("id")
 
 	role := c.Locals("role_name")
-	if role == nil {
+	userID := c.Locals("user_id")
+
+	if role == nil || userID == nil {
 		return c.Status(401).JSON(fiber.Map{
 			"error": "unauthorized",
 		})
 	}
 
-	if role.(string) != "Admin" {
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden: admin only",
+	r := role.(string)
+	uid := userID.(string)
+
+	// ================= ADMIN =================
+	if r == "Admin" {
+		students, err := s.studentRepo.GetByAdvisorID(lecturerID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to get advisees",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    students,
 		})
 	}
 
-	students, err := s.studentRepo.GetByAdvisorID(lecturerID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "failed to get advisees",
+	// ================= DOSEN WALI =================
+	if r == "Dosen Wali" {
+		lecturer, err := s.repo.GetByUserID(uid)
+		if err != nil || lecturer == nil {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "lecturer not found",
+			})
+		}
+
+		// dosen hanya boleh lihat bimbingannya sendiri
+		if lecturer.ID != lecturerID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: cannot access other lecturer advisees",
+			})
+		}
+
+		students, err := s.studentRepo.GetByAdvisorID(lecturer.ID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to get advisees",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data":    students,
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    students,
+	// ================= OTHERS =================
+	return c.Status(403).JSON(fiber.Map{
+		"error": "forbidden",
 	})
 }
 

@@ -40,9 +40,7 @@ func main() {
 	// ============================================================
 	authService := service.NewAuthService(userRepo, roleRepo, rolePermissionRepo)
 	userService := service.NewUserService(userRepo, roleRepo, studentRepo, lecturerRepo)
-	roleService := service.NewRoleService(roleRepo)
 	permissionService := service.NewPermissionService(permissionRepo)
-	rolePermissionService := service.NewRolePermissionService(rolePermissionRepo)
 
 	studentService := service.NewStudentService(studentRepo, userRepo, lecturerRepo)
 
@@ -57,9 +55,9 @@ func main() {
 		lecturerRepo,
 	)
 
-	achievementRefService := service.NewAchievementReferenceService(achievementRefRepo, achievementMongoRepo)
+	achievementRefService := service.NewAchievementReferenceService(achievementRefRepo, achievementMongoRepo, studentRepo, lecturerRepo)
 
-	achievementHistoryService := service.NewAchievementHistoryService(achievementRefRepo, achievementMongoRepo)
+	achievementHistoryService := service.NewAchievementHistoryService(achievementRefRepo, achievementMongoRepo, studentRepo, lecturerRepo)
 
 	reportService := service.NewReportService(achievementRefRepo, studentRepo, lecturerRepo, achievementMongoRepo, userRepo)
 
@@ -78,9 +76,7 @@ func main() {
 		app,
 		authService,
 		userService,
-		roleService,
 		permissionService,
-		rolePermissionService,
 		studentService,
 		lecturerService,
 		achievementService,

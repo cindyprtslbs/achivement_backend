@@ -2,24 +2,29 @@ package service
 
 import (
 	"achievement_backend/app/repository"
-	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type AchievementHistoryService struct {
-	refRepo   repository.AchievementReferenceRepository
-	mongoRepo repository.MongoAchievementRepository
+	refRepo      repository.AchievementReferenceRepository
+	mongoRepo    repository.MongoAchievementRepository
+	studentRepo  repository.StudentRepository
+	lecturerRepo repository.LecturerRepository
 }
 
 func NewAchievementHistoryService(
 	refRepo repository.AchievementReferenceRepository,
 	mongoRepo repository.MongoAchievementRepository,
+	studentRepo repository.StudentRepository,
+	lecturerRepo repository.LecturerRepository,
 ) *AchievementHistoryService {
 	return &AchievementHistoryService{
-		refRepo:   refRepo,
-		mongoRepo: mongoRepo,
+		refRepo:      refRepo,
+		mongoRepo:    mongoRepo,
+		studentRepo:  studentRepo,
+		lecturerRepo: lecturerRepo,
 	}
 }
 
@@ -35,41 +40,89 @@ type HistoryEvent struct {
 func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 	mongoAchievementID := c.Params("id")
 
-	if mongoAchievementID == "" {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "achievement id is required",
+	role := c.Locals("role_name")
+	userID := c.Locals("user_id")
+
+	if role == nil || userID == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "unauthorized",
 		})
 	}
 
-	log.Printf("[HISTORY] Getting history for achievement: %s", mongoAchievementID)
+	r := role.(string)
+	uid := userID.(string)
 
-	// Get achievement reference
+	// ================= GET REFERENCE =================
 	ref, err := s.refRepo.GetByMongoAchievementID(mongoAchievementID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error":  "failed to fetch achievement",
-			"detail": err.Error(),
+			"error": "failed to fetch achievement",
 		})
 	}
 
-	// If not found
 	if ref == nil {
 		return c.Status(404).JSON(fiber.Map{
 			"error": "achievement not found",
 		})
 	}
 
-	// Build history
+	// ================= AUTHORIZATION =================
+	switch r {
+
+	case "Admin":
+		// full access
+		break
+
+	case "Mahasiswa":
+		student, err := s.studentRepo.GetByUserID(uid)
+		if err != nil || student == nil {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "student not found",
+			})
+		}
+
+		if ref.StudentID != student.ID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: not your achievement",
+			})
+		}
+
+	case "Dosen Wali":
+		lecturer, err := s.lecturerRepo.GetByUserID(uid)
+		if err != nil || lecturer == nil {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "lecturer not found",
+			})
+		}
+
+		student, err := s.studentRepo.GetByID(ref.StudentID)
+		if err != nil || student == nil {
+			return c.Status(404).JSON(fiber.Map{
+				"error": "student not found",
+			})
+		}
+
+		if student.AdvisorID == nil || *student.AdvisorID != lecturer.ID {
+			return c.Status(403).JSON(fiber.Map{
+				"error": "forbidden: not your advisee",
+			})
+		}
+
+	default:
+		return c.Status(403).JSON(fiber.Map{
+			"error": "forbidden role",
+		})
+	}
+
+	// ================= BUILD HISTORY =================
 	history := []HistoryEvent{}
 
-	// 1. Created (draft)
 	history = append(history, HistoryEvent{
 		Status:      "draft",
 		Timestamp:   ref.CreatedAt,
 		Description: "Achievement created as draft",
 	})
 
-	// 2. Submitted
 	if ref.SubmittedAt != nil {
 		history = append(history, HistoryEvent{
 			Status:      "submitted",
@@ -78,38 +131,34 @@ func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 		})
 	}
 
-	// 3. Verified or Rejected
 	if ref.VerifiedAt != nil {
-		switch ref.Status {
-		case "verified":
+		if ref.Status == "verified" {
 			history = append(history, HistoryEvent{
 				Status:      "verified",
 				Timestamp:   *ref.VerifiedAt,
 				VerifiedBy:  ref.VerifiedBy,
-				Description: "Achievement verified by lecturer",
+				Description: "Achievement verified",
 			})
+		}
 
-		case "rejected":
+		if ref.Status == "rejected" {
 			history = append(history, HistoryEvent{
 				Status:        "rejected",
 				Timestamp:     *ref.VerifiedAt,
 				VerifiedBy:    ref.VerifiedBy,
 				RejectionNote: ref.RejectionNote,
-				Description:   "Achievement rejected by lecturer",
+				Description:   "Achievement rejected",
 			})
 		}
 	}
 
-	// 4. Deleted (soft delete)
 	if ref.Status == "deleted" {
 		history = append(history, HistoryEvent{
 			Status:      "deleted",
 			Timestamp:   ref.UpdatedAt,
-			Description: "Achievement was deleted by student",
+			Description: "Achievement was deleted",
 		})
 	}
-
-	log.Printf("[HISTORY] Retrieved %d history events", len(history))
 
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -117,4 +166,3 @@ func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 		"data":    history,
 	})
 }
-

@@ -88,7 +88,10 @@ func (s *UserService) Create(c *fiber.Ctx) error {
 	}
 
 	// hash password
-	hashed, _ := bcrypt.GenerateFromPassword([]byte(req.PasswordHash), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.PasswordHash), bcrypt.DefaultCost)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to hash password")
+	}
 	req.PasswordHash = string(hashed)
 
 	if req.RoleID != nil {
@@ -109,11 +112,9 @@ func (s *UserService) Create(c *fiber.Ctx) error {
 	})
 }
 
-//
 // =======================================================
 // UPDATE USER
 // =======================================================
-//
 func (s *UserService) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -170,7 +171,7 @@ func (s *UserService) Update(c *fiber.Ctx) error {
 	}
 
 	// ======================================
-	// OPTIONAL: UPDATE STUDENT PROFILE
+	// UPDATE STUDENT PROFILE
 	// ======================================
 	if req.Student != nil {
 		err := s.setStudentProfileFromUserUpdate(id, req.Student)
@@ -189,7 +190,7 @@ func (s *UserService) Update(c *fiber.Ctx) error {
 	}
 
 	// ======================================
-	// OPTIONAL: UPDATE LECTURER PROFILE
+	// UPDATE LECTURER PROFILE
 	// ======================================
 	if req.Lecturer != nil {
 		err := s.setLecturerProfileFromUserUpdate(id, req.Lecturer)
@@ -240,7 +241,10 @@ func (s *UserService) UpdatePassword(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	}
 
-	hashed, _ := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to hash password")
+	}
 
 	if err := s.userRepo.UpdatePassword(id, string(hashed)); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to update password")

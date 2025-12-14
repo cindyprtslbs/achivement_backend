@@ -79,7 +79,7 @@ type Achievement struct {
 // REQUEST: CREATE ACHIEVEMENT
 // ===============================================================
 type CreateAchievementRequest struct {
-	StudentID       string             `json:"student_id"`
+	StudentID       *string             `json:"student_id"`
 	AchievementType string             `json:"achievement_type"`
 	Title           string             `json:"title"`
 	Description     string             `json:"description"`

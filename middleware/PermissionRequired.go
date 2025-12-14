@@ -9,22 +9,27 @@ func PermissionRequired(permission string) fiber.Handler {
 
 		perms := c.Locals("permissions")
 		if perms == nil {
-			return c.Status(401).JSON(fiber.Map{
-				"error": "unauthorized: maaf, kamu nggak punya permission apapun",
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "unauthorized: permissions not found",
 			})
 		}
 
-		permList := perms.([]string)
+		permList, ok := perms.([]string)
+		if !ok {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "forbidden: invalid permissions format",
+			})
+		}
 
-		// cek apakah permission yg diminta ada dalam token
 		for _, p := range permList {
 			if p == permission {
 				return c.Next()
 			}
 		}
 
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden:  maaf, kamu nggak bisa akses `" + permission + "`",
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "forbidden: missing permission `" + permission + "`",
 		})
 	}
 }
+
