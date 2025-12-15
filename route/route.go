@@ -39,7 +39,7 @@ func SetupRoutes(
 	users.Post("/", middleware.PermissionRequired("user:manage"), userService.Create) // only admin
 	users.Put("/:id", middleware.PermissionRequired("user:manage"), userService.Update) // only admin
 	users.Delete("/:id", middleware.PermissionRequired("user:manage"), userService.Delete) // only admin
-	users.Put("/:id/role", middleware.PermissionRequired("user:manage"), userService.UpdatePassword) // only admin
+	users.Put("/:id/password", middleware.PermissionRequired("user:manage"), userService.UpdatePassword) // only admin
 
 	// ============= ACHIEVEMENTS (Mongo) =============
 	ach := v1.Group("/achievements")
@@ -77,5 +77,5 @@ func SetupRoutes(
 	// LECTURERS
 	lecturers := v1.Group("/lecturers")
 	lecturers.Get("/", middleware.PermissionRequired("user:manage"), lecturerService.GetAll) // only admin
-	lecturers.Get("/:id/advisees", middleware.PermissionRequired("achievement:read"), lecturerService.GetAdvisees) // only admin and lecturer
+	lecturers.Get("/:id/advisees", middleware.PermissionRequired("user:manage"), lecturerService.GetAdvisees) // only admin and lecturer
 }

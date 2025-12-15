@@ -24,12 +24,6 @@ type AchievementMongoService struct {
 func isAdmin(c *fiber.Ctx) bool {
 	return c.Locals("role_name") == "Admin"
 }
-func isMahasiswa(c *fiber.Ctx) bool {
-	return c.Locals("role_name") == "Mahasiswa"
-}
-func isDosenWali(c *fiber.Ctx) bool {
-	return c.Locals("role_name") == "Dosen Wali"
-}
 
 // =====================================================
 // POINT CALCULATOR (AUTO POINTS)
