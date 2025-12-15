@@ -211,19 +211,19 @@ func setupAchievementService() (*fiber.App, *mockAchievementRefRepo) {
 		&mockAchievementLecturerRepo{},
 	)
 
-	app.Get("/refs", service.GetAll)
-	app.Get("/refs/:id", service.GetByID)
-	app.Post("/refs/:id/submit", func(c *fiber.Ctx) error {
+	app.Get("/achievements", service.GetAll)
+	app.Get("/achievements/:id", service.GetByID)
+	app.Post("/achievements/:id/submit", func(c *fiber.Ctx) error {
 		c.Locals("role_name", "Mahasiswa")
 		c.Locals("user_id", "user-1")
 		return service.Submit(c)
 	})
-	app.Post("/refs/:id/verify", func(c *fiber.Ctx) error {
+	app.Post("/achievements/:id/verify", func(c *fiber.Ctx) error {
 		c.Locals("role_name", "Admin")
 		c.Locals("user_id", "lecturer-1")
 		return service.Verify(c)
 	})
-	app.Post("/refs/:id/reject", func(c *fiber.Ctx) error {
+	app.Post("/achievements/:id/reject", func(c *fiber.Ctx) error {
 		c.Locals("role_name", "Admin")
 		c.Locals("user_id", "lecturer-1")
 		return service.Reject(c)
@@ -240,7 +240,7 @@ func setupAchievementService() (*fiber.App, *mockAchievementRefRepo) {
 
 func TestGetAll(t *testing.T) {
 	app, _ := setupAchievementService()
-	req := httptest.NewRequest(http.MethodGet, "/refs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/achievements", nil)
 	resp, err := app.Test(req)
 
 	assert.NoError(t, err)
@@ -249,7 +249,7 @@ func TestGetAll(t *testing.T) {
 
 func TestSubmit(t *testing.T) {
 	app, repo := setupAchievementService()
-	req := httptest.NewRequest(http.MethodPost, "/refs/mongo-1/submit", nil)
+	req := httptest.NewRequest(http.MethodPost, "/achievements/mongo-1/submit", nil)
 	resp, _ := app.Test(req)
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
@@ -258,7 +258,7 @@ func TestSubmit(t *testing.T) {
 
 func TestVerify(t *testing.T) {
 	app, repo := setupAchievementService()
-	req := httptest.NewRequest(http.MethodPost, "/refs/mongo-1/verify", nil)
+	req := httptest.NewRequest(http.MethodPost, "/achievements/mongo-1/verify", nil)
 	resp, _ := app.Test(req)
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
@@ -272,7 +272,7 @@ func TestReject(t *testing.T) {
 		"rejection_note": "invalid data",
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/refs/mongo-1/reject", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/achievements/mongo-1/reject", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, _ := app.Test(req)
