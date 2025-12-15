@@ -14,7 +14,6 @@ type StudentRepository interface {
 	GetByAdvisorID(advisorID string) ([]models.Student, error)
 	Create(req models.CreateStudentRequest) (*models.Student, error)
 	Update(id string, req models.UpdateStudentRequest) (*models.Student, error)
-	Delete(id string) error
 	UpdateAdvisor(id string, advisorID string) error
 }
 
@@ -263,20 +262,6 @@ func (r *studentRepository) Update(id string, req models.UpdateStudentRequest) (
 	}
 
 	return r.GetByID(id)
-}
-
-func (r *studentRepository) Delete(id string) error {
-	result, err := r.db.Exec(`DELETE FROM students WHERE id=$1`, id)
-	if err != nil {
-		return err
-	}
-
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
 }
 
 func (r *studentRepository) UpdateAdvisor(id string, advisorID string) error {

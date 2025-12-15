@@ -12,7 +12,6 @@ type LecturerRepository interface {
 	GetByUserID(userID string) (*models.Lecturer, error)
 	Create(req models.CreateLecturerRequest) (*models.Lecturer, error)
 	Update(id string, req models.UpdateLecturerRequest) (*models.Lecturer, error)
-	Delete(id string) error
 	GetByLecturerID(lecturerID string) (*models.Lecturer, error)
 }
 
@@ -133,20 +132,6 @@ func (r *lecturerRepository) Update(id string, req models.UpdateLecturerRequest)
 	}
 
 	return r.GetByID(id)
-}
-
-func (r *lecturerRepository) Delete(id string) error {
-	result, err := r.db.Exec(`DELETE FROM lecturers WHERE id=$1`, id)
-	if err != nil {
-		return err
-	}
-
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
 }
 
 func (r *lecturerRepository) GetByLecturerID(lecturerID string) (*models.Lecturer, error) {

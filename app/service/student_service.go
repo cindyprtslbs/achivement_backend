@@ -162,18 +162,6 @@ func (s *StudentService) Update(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "message": "updated", "data": student})
 }
 
-// ======================================================
-// DELETE STUDENT
-// ======================================================
-func (s *StudentService) Delete(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	if err := s.repo.Delete(id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to delete student"})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "message": "student deleted"})
-}
 
 // ======================================================
 // UPDATE ADVISOR (ADMIN ONLY)

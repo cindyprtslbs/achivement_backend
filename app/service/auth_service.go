@@ -17,6 +17,8 @@ type AuthService struct {
 	userRepo     repository.UserRepository
 	roleRepo     repository.RoleRepository
 	rolePermRepo repository.RolePermissionRepository
+	studentRepo  repository.StudentRepository
+	lecturerRepo repository.LecturerRepository
 }
 
 type refreshEntry struct {
@@ -39,11 +41,15 @@ func NewAuthService(
 	userRepo repository.UserRepository,
 	roleRepo repository.RoleRepository,
 	rolePermRepo repository.RolePermissionRepository,
+	studentRepo repository.StudentRepository,
+	lecturerRepo repository.LecturerRepository,
 ) *AuthService {
 	return &AuthService{
 		userRepo:     userRepo,
 		roleRepo:     roleRepo,
 		rolePermRepo: rolePermRepo,
+		studentRepo:  studentRepo,
+		lecturerRepo: lecturerRepo,
 	}
 }
 
@@ -223,15 +229,43 @@ func (s *AuthService) Logout(c *fiber.Ctx) error {
 // ===============================================================
 // GET PROFILE (FR-002 Authorization)
 // ===============================================================
-
 func (s *AuthService) GetProfile(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	role := c.Locals("role_name").(string)
+
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"success": false,
+			"message": "User not found",
+		})
+	}
+
+	data := fiber.Map{
+		"id":        user.ID,
+		"username":  user.Username,
+		"email":     user.Email,
+		"full_name": user.FullName,
+		"role":      user.RoleName,
+		"is_active": user.IsActive,
+	}
+
+	switch role {
+	case "student":
+		student, _ := s.studentRepo.GetByUserID(userID)
+		data["profile"] = student
+
+	case "lecturer":
+		lecturer, _ := s.lecturerRepo.GetByUserID(userID)
+		data["profile"] = lecturer
+
+	case "admin":
+		data["profile"] = nil
+	}
+
 	return c.JSON(fiber.Map{
 		"success": true,
-		"data": fiber.Map{
-			"user_id":     c.Locals("user_id"),
-			"username":    c.Locals("username"),
-			"role_name":   c.Locals("role_name"),
-			"permissions": c.Locals("permissions"),
-		},
+		"data":    data,
 	})
 }
+

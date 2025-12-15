@@ -275,14 +275,12 @@ func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
 		})
 	}
 
-	// SYNC MONGO
 	if err := s.mongoRepo.UpdateStatus(ctx, mongoID, "rejected"); err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "failed to sync mongo status",
 		})
 	}
 
-	// 🔥 RELOAD
 	updatedRef, err := s.repo.GetByID(ref.ID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{

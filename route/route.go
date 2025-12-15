@@ -79,6 +79,3 @@ func SetupRoutes(
 	lecturers.Get("/", middleware.PermissionRequired("user:manage"), lecturerService.GetAll) // only admin
 	lecturers.Get("/:id/advisees", middleware.PermissionRequired("achievement:read"), lecturerService.GetAdvisees) // only admin and lecturer
 }
-
-
-// selanjutnya memperbaiki service dan model sesuai dengan route yang telah dibuat

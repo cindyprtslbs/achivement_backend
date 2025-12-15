@@ -38,7 +38,7 @@ func main() {
 	// ============================================================
 	// 3. INIT SERVICES
 	// ============================================================
-	authService := service.NewAuthService(userRepo, roleRepo, rolePermissionRepo)
+	authService := service.NewAuthService(userRepo, roleRepo, rolePermissionRepo, studentRepo, lecturerRepo)
 	userService := service.NewUserService(userRepo, roleRepo, studentRepo, lecturerRepo)
 	permissionService := service.NewPermissionService(permissionRepo)
 
