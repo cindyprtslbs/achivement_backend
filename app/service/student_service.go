@@ -1,7 +1,7 @@
 package service
 
 import (
-	models "achievement_backend/app/model"
+	// models "achievement_backend/app/model"
 	"achievement_backend/app/repository"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,9 +25,18 @@ func NewStudentService(
 	}
 }
 
-// ======================================================
-// GET ALL STUDENTS (ONLY ADMIN)
-// ======================================================
+// GetAllStudents godoc
+// @Summary Mendapatkan daftar semua mahasiswa
+// @Description Mendapatkan daftar semua mahasiswa (hanya untuk Admin)
+// @Tags Student
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Daftar mahasiswa"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/students [get]
 func (s *StudentService) GetAll(c *fiber.Ctx) error {
 	roleName := c.Locals("role_name")
 	if roleName == nil {
@@ -58,9 +67,19 @@ func (s *StudentService) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-// ======================================================
-// GET STUDENT BY ID (ONLY ADMIN)
-// ======================================================
+// GetStudentByID godoc
+// @Summary Mendapatkan detail mahasiswa berdasarkan ID
+// @Description Mendapatkan detail mahasiswa berdasarkan ID (hanya untuk Admin)
+// @Tags Student
+// @Accept json
+// @Produce json
+// @Param id path string true "ID Mahasiswa"
+// @Success 200 {object} map[string]interface{} "Detail mahasiswa"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Mahasiswa tidak ditemukan"
+// @Security Bearer
+// @Router /api/v1/students/{id} [get]
 func (s *StudentService) GetByID(c *fiber.Ctx) error {
 	roleName := c.Locals("role_name")
 	if roleName == nil {
@@ -93,79 +112,22 @@ func (s *StudentService) GetByID(c *fiber.Ctx) error {
 	})
 }
 
-// ======================================================
-// GET STUDENT BY USER ID
-// ======================================================
-func (s *StudentService) GetByUserID(c *fiber.Ctx) error {
-	userID := c.Params("user_id")
-
-	student, err := s.repo.GetByUserID(userID)
-	if err != nil || student == nil {
-		return c.Status(404).JSON(fiber.Map{"error": "student not found"})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "data": student})
-}
-
-// ======================================================
-// GET STUDENTS BY ADVISOR
-// ======================================================
-func (s *StudentService) GetByAdvisorID(c *fiber.Ctx) error {
-	advisorID := c.Params("advisor_id")
-
-	data, err := s.repo.GetByAdvisorID(advisorID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get students"})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "data": data})
-}
-
-// ======================================================
-// CREATE STUDENT (Admin)
-// ======================================================
-func (s *StudentService) Create(c *fiber.Ctx) error {
-	var req models.CreateStudentRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-
-	student, err := s.repo.Create(req)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to create student"})
-	}
-
-	return c.Status(201).JSON(fiber.Map{
-		"success": true,
-		"message": "student created",
-		"data":    student,
-	})
-}
-
-// ======================================================
-// UPDATE STUDENT (Admin)
-// ======================================================
-func (s *StudentService) Update(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	var req models.UpdateStudentRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-
-	student, err := s.repo.Update(id, req)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to update student"})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "message": "updated", "data": student})
-}
-
-
-// ======================================================
-// UPDATE ADVISOR (ADMIN ONLY)
-// ======================================================
+// UpdateAdvisor godoc
+// @Summary Memperbarui dosen wali mahasiswa
+// @Description Memperbarui dosen wali dari seorang mahasiswa (hanya untuk Admin)
+// @Tags Student
+// @Accept json
+// @Produce json
+// @Param id path string true "ID Mahasiswa"
+// @Param advisor body map[string]string true "ID Dosen Wali Baru" example({"advisor_id": "lecturer123"})
+// @Success 200 {object} map[string]interface{} "Dosen wali berhasil diperbarui"
+// @Failure 400 {object} map[string]interface{} "advisor_id is required"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} map[string]interface{} "Gagal memperbarui dosen wali"
+// @Security Bearer
+// @Router /api/v1/students/{id}/advisor [put]
 func (s *StudentService) UpdateAdvisor(c *fiber.Ctx) error {
 	roleName := c.Locals("role_name")
 	if roleName == nil {

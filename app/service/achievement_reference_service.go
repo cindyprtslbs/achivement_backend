@@ -28,7 +28,18 @@ func NewAchievementReferenceService(
 	}
 }
 
-// ================= GET ALL =================
+// GetAll godoc
+// @Summary Get all achievement references
+// @Description Mengambil daftar achievement reference dengan pagination dan detail dari MongoDB
+// @Tags Achievement Reference
+// @Accept json
+// @Produce json
+// @Param page query int false "Nomor halaman" default(1)
+// @Param limit query int false "Jumlah data per halaman" default(10)
+// @Success 200 {object} map[string]interface{} "Daftar achievement references"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/achievements [get]
 func (s *AchievementReferenceService) GetAll(c *fiber.Ctx) error {
 
 	page := c.QueryInt("page", 1)
@@ -78,7 +89,18 @@ func (s *AchievementReferenceService) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-// ================= GET BY ID =================
+// GetByID godoc
+// @Summary Get achievement reference by ID
+// @Description Mengambil satu achievement reference beserta detail MongoDB
+// @Tags Achievement Reference
+// @Accept json
+// @Produce json
+// @Param id path string true "Reference ID"
+// @Success 200 {object} map[string]interface{} "Detail achievement reference"
+// @Failure 404 {object} map[string]interface{} "Reference tidak ditemukan"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/achievements/{id} [get]
 func (s *AchievementReferenceService) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -98,7 +120,6 @@ func (s *AchievementReferenceService) GetByID(c *fiber.Ctx) error {
 	})
 }
 
-// ================= GET BY STUDENT =================
 func (s *AchievementReferenceService) GetByStudent(c *fiber.Ctx) error {
 	studentID := c.Params("student_id")
 
@@ -110,7 +131,20 @@ func (s *AchievementReferenceService) GetByStudent(c *fiber.Ctx) error {
 	return c.JSON(data)
 }
 
-// ================= SUBMIT =================
+// Submit godoc
+// @Summary Submit achievement
+// @Description Mengirim achievement dari status draft ke submitted (Mahasiswa atau Admin)
+// @Tags Achievement Reference
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Success 200 {object} map[string]interface{} "Achievement berhasil disubmit"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Reference tidak ditemukan"
+// @Failure 400 {object} map[string]interface{} "Status tidak valid"
+// @Failure 500 {object} map[string]interface{} "Gagal sinkronisasi MongoDB"
+// @Security Bearer
+// @Router /api/v1/achievements/{id}/submit [post]
 func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
 	mongoID := c.Params("id")
@@ -165,7 +199,20 @@ func (s *AchievementReferenceService) Submit(c *fiber.Ctx) error {
 	})
 }
 
-// ================= VERIFY =================
+// Verify godoc
+// @Summary Verify achievement
+// @Description Memverifikasi achievement yang sudah disubmit (Admin atau Dosen Wali)
+// @Tags Achievement Reference
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Success 200 {object} map[string]interface{} "Achievement berhasil diverifikasi"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Reference tidak ditemukan"
+// @Failure 400 {object} map[string]interface{} "Status tidak valid"
+// @Failure 500 {object} map[string]interface{} "Gagal sinkronisasi MongoDB"
+// @Security Bearer
+// @Router /api/v1/achievements/{id}/verify [post]
 func (s *AchievementReferenceService) Verify(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
 	mongoID := c.Params("id")
@@ -230,7 +277,21 @@ func (s *AchievementReferenceService) Verify(c *fiber.Ctx) error {
 	})
 }
 
-// ================= REJECT =================
+// Reject godoc
+// @Summary Reject achievement
+// @Description Menolak achievement dengan catatan penolakan (Admin atau Dosen Wali)
+// @Tags Achievement Reference
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Param body body object true "Rejection note" example({"rejection_note":"Data tidak valid"})
+// @Success 200 {object} map[string]interface{} "Achievement berhasil ditolak"
+// @Failure 400 {object} map[string]interface{} "Rejection note wajib diisi"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Reference tidak ditemukan"
+// @Failure 500 {object} map[string]interface{} "Gagal sinkronisasi MongoDB"
+// @Security Bearer
+// @Router /api/v1/achievements/{id}/reject [post]
 func (s *AchievementReferenceService) Reject(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
 	mongoID := c.Params("id")

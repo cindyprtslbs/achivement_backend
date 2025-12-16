@@ -38,7 +38,18 @@ func NewLecturerServiceWithDependencies(
     }
 }
 
-// GET ALL LECTURERS (ADMIN ONLY)
+// GetLecturers godoc
+// @Summary Mendapatkan daftar dosen
+// @Description Mendapatkan daftar semua dosen (hanya untuk Admin)
+// @Tags Lecturer
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Daftar dosen"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/lecturers [get]
 func (s *LecturerService) GetAll(c *fiber.Ctx) error {
 	role := c.Locals("role_name")
 
@@ -63,34 +74,19 @@ func (s *LecturerService) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-
-// GET LECTURER BY USER ID
-func (s *LecturerService) GetByUserID(c *fiber.Ctx) error {
-	userID := c.Params("user_id")
-
-	role := c.Locals("role_name").(string)
-	uid := c.Locals("user_id").(string)
-
-	if role == "Dosen Wali" && uid != userID {
-		return c.Status(403).JSON(fiber.Map{
-			"error": "forbidden",
-		})
-	}
-
-	lecturer, err := s.repo.GetByUserID(userID)
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "lecturer not found"})
-	}
-
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data":    lecturer,
-	})
-}
-
-// ============================================
-// GET ADVISEES (ADMIN & DOSEN WALI)
-// ============================================
+// GetAdvisees godoc
+// @Summary Mendapatkan daftar mahasiswa bimbingan dosen
+// @Description Mendapatkan daftar mahasiswa bimbingan dari dosen tertentu
+// @Tags Lecturer
+// @Accept json
+// @Produce json
+// @Param id path string true "ID Dosen"
+// @Success 200 {object} map[string]interface{} "Daftar mahasiswa bimbingan"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/lecturers/{id}/advisees [get]
 func (s *LecturerService) GetAdvisees(c *fiber.Ctx) error {
 	lecturerID := c.Params("id")
 

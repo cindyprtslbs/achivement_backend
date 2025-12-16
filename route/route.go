@@ -12,7 +12,7 @@ func SetupRoutes(
 
 	authService *service.AuthService,
 	userService *service.UserService,
-	permissionService *service.PermissionService,
+	// permissionService *service.PermissionService,
 	studentService *service.StudentService,
 	lecturerService *service.LecturerService,
 	achievementService *service.AchievementMongoService,

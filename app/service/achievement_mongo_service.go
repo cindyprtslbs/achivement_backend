@@ -25,9 +25,6 @@ func isAdmin(c *fiber.Ctx) bool {
 	return c.Locals("role_name") == "Admin"
 }
 
-// =====================================================
-// POINT CALCULATOR (AUTO POINTS)
-// =====================================================
 func CalculatePoints(req *models.CreateAchievementRequest) int {
 	// Competition scoring
 	if req.AchievementType == "competition" {
@@ -99,11 +96,23 @@ func NewAchievementMongoService(
 	}
 }
 
-// -----------------------
-// ListByRole, GetDetail, UpdateStatus, GetByStudent
-// keep same as before (unchanged logic)
-// -----------------------
-
+// ListAchievementsByRole godoc
+// @Summary Mendapatkan daftar prestasi berdasarkan role
+// @Description
+// Admin melihat semua prestasi,
+// Dosen Wali melihat prestasi mahasiswa bimbingan,
+// Mahasiswa melihat prestasi miliknya sendiri
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Param page query int false "Nomor halaman (default: 1)"
+// @Param limit query int false "Jumlah data per halaman (default: 10)"
+// @Success 200 {object} map[string]interface{} "Daftar prestasi"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements [get]
 func (s *AchievementMongoService) ListByRole(c *fiber.Ctx) error {
     userID := c.Locals("user_id")
     roleName := c.Locals("role_name")
@@ -245,7 +254,24 @@ func (s *AchievementMongoService) ListByRole(c *fiber.Ctx) error {
     return c.Status(403).JSON(fiber.Map{"error": "invalid role"})
 }
 
-
+// GetAchievementDetail godoc
+// @Summary Mendapatkan detail prestasi
+// @Description
+// Admin dapat melihat semua prestasi,
+// Mahasiswa hanya prestasi miliknya,
+// Dosen Wali hanya prestasi mahasiswa bimbingan
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Success 200 {object} map[string]interface{} "Detail prestasi"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Not found"
+// @Failure 410 {object} map[string]interface{} "Achievement deleted"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements/{id} [get]
 func (s *AchievementMongoService) GetDetail(c *fiber.Ctx) error {
 	mongoID := c.Params("id")
 	ctx := c.Context()
@@ -334,10 +360,21 @@ func (s *AchievementMongoService) GetDetail(c *fiber.Ctx) error {
 	})
 }
 
-
-// ===========================================================
-// CREATE DRAFT  (AUTO POINTS) — FIXED: don't set req.Points
-// ===========================================================
+// CreateAchievementDraft godoc
+// @Summary Membuat prestasi draft
+// @Description
+// Mahasiswa membuat prestasi miliknya,
+// Admin dapat membuat prestasi untuk mahasiswa tertentu
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Param body body models.CreateAchievementRequest true "Data prestasi"
+// @Success 201 {object} map[string]interface{} "Prestasi berhasil dibuat"
+// @Failure 400 {object} map[string]interface{} "Input tidak valid"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements [post]
 func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 	var req models.CreateAchievementRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -378,9 +415,21 @@ func (s *AchievementMongoService) CreateDraft(c *fiber.Ctx) error {
 	})
 }
 
-// ===========================================================
-// UPDATE DRAFT (AUTO RECALCULATE POINTS) — FIXED
-// ===========================================================
+// UpdateAchievementDraft godoc
+// @Summary Mengupdate prestasi draft
+// @Description Hanya prestasi dengan status draft yang dapat diupdate
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Param body body models.UpdateAchievementRequest true "Data prestasi"
+// @Success 200 {object} map[string]interface{} "Prestasi berhasil diupdate"
+// @Failure 400 {object} map[string]interface{} "Status tidak valid"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Not found"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements/{id} [put]
 func (s *AchievementMongoService) UpdateDraft(c *fiber.Ctx) error {
 	id := c.Params("id")
 	role := c.Locals("role_name").(string)
@@ -442,9 +491,19 @@ func (s *AchievementMongoService) UpdateDraft(c *fiber.Ctx) error {
 	})
 }
 
-// ===========================================================
-// SOFT DELETE
-// ===========================================================
+// DeleteAchievement godoc
+// @Summary Menghapus prestasi (soft delete)
+// @Description Admin atau Mahasiswa pemilik dapat menghapus prestasi
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Success 200 {object} map[string]interface{} "Prestasi berhasil dihapus"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Not found"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements/{id} [delete]
 func (s *AchievementMongoService) SoftDelete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	ctx := c.Context()
@@ -506,9 +565,21 @@ DELETE:
 	})
 }
 
-// ===========================================================
-// UPDATE ATTACHMENTS (unchanged except no points here)
-// ===========================================================
+// UpdateAchievementAttachments godoc
+// @Summary Update lampiran prestasi
+// @Description Mengupdate lampiran prestasi (hanya draft)
+// @Tags Achievements
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "Mongo Achievement ID"
+// @Param attachments formData file false "Lampiran file"
+// @Success 200 {object} map[string]interface{} "Lampiran berhasil diupdate"
+// @Failure 400 {object} map[string]interface{} "Input tidak valid"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Not found"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/achievements/{id}/attachments [post]
 func (s *AchievementMongoService) UpdateAttachments(c *fiber.Ctx) error {
 	id := c.Params("id")
 	ctx := c.Context()
@@ -603,9 +674,19 @@ func (s *AchievementMongoService) UpdateAttachments(c *fiber.Ctx) error {
 	})
 }
 
-// ===========================================================
-// GET BY STUDENT
-// ===========================================================
+// GetAchievementsByStudent godoc
+// @Summary Mendapatkan prestasi berdasarkan mahasiswa
+// @Description Admin atau Dosen Wali melihat prestasi mahasiswa tertentu
+// @Tags Student
+// @Accept json
+// @Produce json
+// @Param id path string true "Student ID"
+// @Success 200 {object} map[string]interface{} "Daftar prestasi mahasiswa"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Not found"
+// @Failure 500 {object} map[string]interface{} "Server error"
+// @Security Bearer
+// @Router /api/v1/students/{id}/achievements [get]
 func (s *AchievementMongoService) GetByStudent(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 	ctx := c.Context()
@@ -664,9 +745,7 @@ func (s *AchievementMongoService) GetByStudent(c *fiber.Ctx) error {
 	})
 }
 
-// ===========================================================
-// UPDATE STATUS (wrapper)
-// ===========================================================
+
 func (s *AchievementMongoService) UpdateStatus(ctx context.Context, mongoID string, status string) error {
 	return s.mongoRepo.UpdateStatus(ctx, mongoID, status)
 }

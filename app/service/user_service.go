@@ -30,11 +30,16 @@ func NewUserService(
 	}
 }
 
-//
-// =======================================================
-// GET ALL USERS
-// =======================================================
-//
+// GetAllUsers godoc
+// @Summary Mendapatkan daftar semua pengguna
+// @Description Mendapatkan daftar semua pengguna
+// @Tags User
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Daftar pengguna"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/users [get]
 func (s *UserService) GetAll(c *fiber.Ctx) error {
 	users, err := s.userRepo.GetAll()
 	if err != nil {
@@ -47,11 +52,17 @@ func (s *UserService) GetAll(c *fiber.Ctx) error {
 	})
 }
 
-//
-// =======================================================
-// GET BY ID
-// =======================================================
-//
+// GetUserByID godoc
+// @Summary Mendapatkan detail pengguna berdasarkan ID
+// @Description Mendapatkan detail pengguna berdasarkan ID
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {object} map[string]interface{} "Detail pengguna"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Security Bearer
+// @Router /api/v1/users/{id} [get]
 func (s *UserService) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -66,11 +77,18 @@ func (s *UserService) GetByID(c *fiber.Ctx) error {
 	})
 }
 
-//
-// =======================================================
-// CREATE USER
-// =======================================================
-//
+// CreateUser godoc
+// @Summary Membuat pengguna baru
+// @Description Membuat pengguna baru
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param user body models.CreateUserRequest true "Data pengguna baru"
+// @Success 201 {object} map[string]interface{} "Pengguna berhasil dibuat"
+// @Failure 400 {object} map[string]interface{} "Invalid request body atau data sudah ada"
+// @Failure 500 {object} map[string]interface{} "Gagal membuat pengguna"
+// @Security Bearer
+// @Router /api/v1/users [post]
 func (s *UserService) Create(c *fiber.Ctx) error {
 	var req models.CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -112,9 +130,20 @@ func (s *UserService) Create(c *fiber.Ctx) error {
 	})
 }
 
-// =======================================================
-// UPDATE USER
-// =======================================================
+// UpdateUser godoc
+// @Summary Memperbarui data pengguna
+// @Description Memperbarui data pengguna berdasarkan ID
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param user body models.UpdateUserRequest true "Data pengguna yang diperbarui"
+// @Success 200 {object} map[string]interface{} "Pengguna berhasil diperbarui"
+// @Failure 400 {object} map[string]interface{} "Invalid request body atau data sudah ada"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Gagal memperbarui pengguna"
+// @Security Bearer
+// @Router /api/v1/users/{id} [put]
 func (s *UserService) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -128,10 +157,6 @@ func (s *UserService) Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request")
 	}
-
-	// ======================================
-	// OPTIONAL FIELDS UPDATE
-	// ======================================
 
 	if req.Username != nil {
 		if u, _ := s.userRepo.GetByUsername(*req.Username); u != nil && u.ID != existing.ID {
@@ -217,11 +242,20 @@ func (s *UserService) Update(c *fiber.Ctx) error {
 	})
 }
 
-//
-// =======================================================
-// UPDATE PASSWORD
-// =======================================================
-//
+// UpdatePassword godoc
+// @Summary Memperbarui password pengguna
+// @Description Memperbarui password pengguna berdasarkan ID
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param password body map[string]string true "Password baru"
+// @Success 200 {object} map[string]interface{} "Password berhasil diperbarui"
+// @Failure 400 {object} map[string]interface{} "Invalid request body"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Gagal memperbarui password"
+// @Security Bearer
+// @Router /api/v1/users/{id}/password [put]
 func (s *UserService) UpdatePassword(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -256,11 +290,18 @@ func (s *UserService) UpdatePassword(c *fiber.Ctx) error {
 	})
 }
 
-//
-// =======================================================
-// DELETE USER
-// =======================================================
-//
+// DeleteUser godoc
+// @Summary Menghapus user
+// @Description Menghapus user berdasarkan ID
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {object} map[string]interface{} "User berhasil dihapus"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Gagal menghapus user"
+// @Security Bearer
+// @Router /api/v1/users/{id} [delete]
 func (s *UserService) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -278,11 +319,20 @@ func (s *UserService) Delete(c *fiber.Ctx) error {
 	})
 }
 
-//
-// =======================================================
-// SET STUDENT PROFILE (from Update User)
-// =======================================================
-//
+// SetStudentProfile godoc
+// @Summary Mengatur profil mahasiswa untuk pengguna
+// @Description Mengatur profil mahasiswa untuk pengguna berdasarkan ID pengguna
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param profile body models.SetStudentProfileRequest true "Data profil mahasiswa"
+// @Success 200 {object} map[string]interface{} "Profil mahasiswa berhasil diatur"
+// @Failure 400 {object} map[string]interface{} "Invalid request body atau user bukan Mahasiswa"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Gagal mengatur profil mahasiswa"
+// @Security Bearer
+// @Router /api/v1/users/{id} [put]
 func (s *UserService) setStudentProfileFromUserUpdate(userId string, data *models.SetStudentProfileRequest) error {
 	if data == nil {
 		return nil
@@ -325,11 +375,20 @@ func (s *UserService) setStudentProfileFromUserUpdate(userId string, data *model
 	return err
 }
 
-//
-// =======================================================
-// SET LECTURER PROFILE (from Update User)
-// =======================================================
-//
+// SetLecturerProfile godoc
+// @Summary Mengatur profil dosen untuk pengguna
+// @Description Mengatur profil dosen untuk pengguna berdasarkan ID pengguna
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID"
+// @Param profile body models.SetLecturerProfileRequest true "Data profil dosen"
+// @Success 200 {object} map[string]interface{} "Profil dosen berhasil diatur"
+// @Failure 400 {object} map[string]interface{} "Invalid request body atau user bukan Dosen Wali"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Gagal mengatur profil dosen"
+// @Security Bearer
+// @Router /api/v1/users/{id} [put]
 func (s *UserService) setLecturerProfileFromUserUpdate(userId string, data *models.SetLecturerProfileRequest) error {
 	if data == nil {
 		return nil

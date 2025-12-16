@@ -33,10 +33,6 @@ var (
 	refreshTokenTTL = time.Hour * 24 * 7 // 7 hari
 )
 
-// ===============================================================
-// CONSTRUCTOR
-// ===============================================================
-
 func NewAuthService(
 	userRepo repository.UserRepository,
 	roleRepo repository.RoleRepository,
@@ -53,10 +49,19 @@ func NewAuthService(
 	}
 }
 
-// ===============================================================
-// LOGIN (FR-001)
-// ===============================================================
-
+// Login godoc
+// @Summary Login pengguna
+// @Description Autentikasi pengguna menggunakan username dan password, mengembalikan access token dan refresh token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body models.LoginRequest true "Username dan Password"
+// @Success 200 {object} models.LoginResponse "Login berhasil"
+// @Failure 400 {object} map[string]interface{} "Request tidak valid"
+// @Failure 401 {object} map[string]interface{} "Username atau password salah"
+// @Failure 403 {object} map[string]interface{} "User tidak aktif"
+// @Failure 500 {object} map[string]interface{} "Kesalahan server"
+// @Router /api/v1/auth/login [post]
 func (s *AuthService) Login(c *fiber.Ctx) error {
 	var req models.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -138,10 +143,18 @@ func (s *AuthService) Login(c *fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
-// ===============================================================
-// REFRESH TOKEN
-// ===============================================================
-
+// RefreshToken godoc
+// @Summary Refresh access token
+// @Description Menghasilkan access token baru menggunakan refresh token yang masih valid
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body object true "Refresh token" example({"refresh_token":"string"})
+// @Success 200 {object} map[string]interface{} "Token berhasil diperbarui"
+// @Failure 400 {object} map[string]interface{} "Refresh token wajib diisi"
+// @Failure 401 {object} map[string]interface{} "Refresh token tidak valid atau kadaluarsa"
+// @Failure 500 {object} map[string]interface{} "Kesalahan server"
+// @Router /api/v1/auth/refresh [post]
 func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
 	var body struct {
 		Refresh string `json:"refresh_token"`
@@ -189,10 +202,16 @@ func (s *AuthService) RefreshToken(c *fiber.Ctx) error {
 	})
 }
 
-// ===============================================================
-// LOGOUT
-// ===============================================================
-
+// Logout godoc
+// @Summary Logout pengguna
+// @Description Logout pengguna dan mem-blacklist access token serta menghapus refresh token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Logout berhasil"
+// @Failure 400 {object} map[string]interface{} "Token tidak ditemukan"
+// @Security Bearer
+// @Router /api/v1/auth/logout [post]
 func (s *AuthService) Logout(c *fiber.Ctx) error {
 	raw := c.Locals("raw_token")
 	if raw == nil {
@@ -226,9 +245,17 @@ func (s *AuthService) Logout(c *fiber.Ctx) error {
 	})
 }
 
-// ===============================================================
-// GET PROFILE (FR-002 Authorization)
-// ===============================================================
+// GetProfile godoc
+// @Summary Mendapatkan profil pengguna
+// @Description Mengambil data profil pengguna berdasarkan token (Mahasiswa, Dosen Wali, atau Admin)
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Profil pengguna"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 404 {object} map[string]interface{} "User tidak ditemukan"
+// @Security Bearer
+// @Router /api/v1/auth/profile [get]
 func (s *AuthService) GetProfile(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	role := c.Locals("role_name").(string)
@@ -251,15 +278,15 @@ func (s *AuthService) GetProfile(c *fiber.Ctx) error {
 	}
 
 	switch role {
-	case "student":
+	case "Mahasiswa":
 		student, _ := s.studentRepo.GetByUserID(userID)
 		data["profile"] = student
 
-	case "lecturer":
+	case "Dosen Wali":
 		lecturer, _ := s.lecturerRepo.GetByUserID(userID)
 		data["profile"] = lecturer
 
-	case "admin":
+	case "Admin":
 		data["profile"] = nil
 	}
 
@@ -268,4 +295,3 @@ func (s *AuthService) GetProfile(c *fiber.Ctx) error {
 		"data":    data,
 	})
 }
-

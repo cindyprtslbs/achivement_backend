@@ -2,7 +2,7 @@ package service
 
 import (
 	"bytes"
-	"encoding/json"
+	// "encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -84,35 +84,6 @@ func TestStudentService_GetAll_NonAdmin(t *testing.T) {
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
-func TestStudentService_Create(t *testing.T) {
-	mockRepo := &MockStudentRepo{
-		CreateFn: func(req models.CreateStudentRequest) (*models.Student, error) {
-			return &models.Student{
-				ID:        "1",
-				StudentID: req.StudentID,
-			}, nil
-		},
-	}
-
-	app := fiber.New()
-	service := NewStudentService(mockRepo, nil, nil)
-
-	app.Post("/students", service.Create)
-
-	body, _ := json.Marshal(models.CreateStudentRequest{
-		UserID:       "user-1",
-		StudentID:    "20231234",
-		ProgramStudy: "Informatika",
-		AcademicYear: "2023",
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/students", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, _ := app.Test(req)
-
-	assert.Equal(t, 201, resp.StatusCode)
-}
 
 func TestStudentService_UpdateAdvisor_Admin(t *testing.T) {
 	mockRepo := &MockStudentRepo{

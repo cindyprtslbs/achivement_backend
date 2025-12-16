@@ -47,6 +47,22 @@ type TopStudent struct {
 	Points    int64  `json:"points"`
 }
 
+// GetStatistics godoc
+// @Summary Mendapatkan statistik prestasi
+// @Description Mendapatkan statistik prestasi berdasarkan peran pengguna yang mengakses
+// @Description Akses:
+// @Description - Admin: semua data
+// @Description - Mahasiswa: hanya achievement miliknya
+// @Description - Dosen Wali: hanya achievement mahasiswa bimbingan
+// @Tags Report
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Statistik prestasi"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/reports/statistics [get]
 func (s *ReportService) GetStatistics(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
 	userID := c.Locals("user_id").(string)
@@ -175,6 +191,24 @@ func (s *ReportService) GetStatistics(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentReport godoc
+// @Summary Mendapatkan laporan prestasi mahasiswa
+// @Description Mendapatkan laporan prestasi mahasiswa berdasarkan ID mahasiswa dengan filter role pengguna yang mengakses
+// @Description Akses:
+// @Description - Admin: semua data
+// @Description - Mahasiswa: hanya own report
+// @Description - Dosen Wali: hanya laporan mahasiswa bimbingan
+// @Tags Report
+// @Accept json
+// @Produce json
+// @Param id path string true "ID Mahasiswa"
+// @Success 200 {object} map[string]interface{} "Laporan prestasi mahasiswa"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} map[string]interface{} "Gagal mengambil data"
+// @Security Bearer
+// @Router /api/v1/reports/student/{id} [get]
 func (s *ReportService) GetStudentReport(c *fiber.Ctx) error {
 	role := c.Locals("role_name").(string)
 	loggedUID := c.Locals("user_id").(string)

@@ -36,7 +36,24 @@ type HistoryEvent struct {
 	Description   string    `json:"description"`
 }
 
-// ================= GET HISTORY =================
+// GetHistory godoc
+// @Summary Mendapatkan riwayat perubahan status prestasi
+// @Description Mendapatkan riwayat perubahan status dari sebuah prestasi berdasarkan ID prestasi di MongoDB
+// @Description Akses:
+// @Description - Admin: semua data
+// @Description - Mahasiswa: hanya achievement miliknya
+// @Description - Dosen Wali: hanya achievement mahasiswa bimbingan
+// @Tags Achievement History
+// @Accept json
+// @Produce json
+// @Param id path string true "ID Prestasi di MongoDB"
+// @Success 200 {object} map[string]interface{} "Riwayat perubahan status prestasi"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Achievement not found"
+// @Failure 500 {object} map[string]interface{} "Failed to fetch achievement"
+// @Security Bearer
+// @Router /api/v1/achievements/{id}/history [get]
 func (s *AchievementHistoryService) GetHistory(c *fiber.Ctx) error {
 	mongoAchievementID := c.Params("id")
 
